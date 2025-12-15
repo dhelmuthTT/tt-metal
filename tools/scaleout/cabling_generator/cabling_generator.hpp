@@ -25,7 +25,27 @@ class ChildInstance;
 
 namespace tt::scaleout_tools {
 enum class NodeType;
-struct MergeValidationResult;
+
+struct MergeValidationResult {
+    bool success = true;
+    std::vector<std::string> warnings;
+    std::vector<std::string> errors;
+
+    void add_warning(const std::string& msg) { warnings.push_back(msg); }
+
+    void add_error(const std::string& msg) {
+        errors.push_back(msg);
+        success = false;
+    }
+
+    void merge(const MergeValidationResult& other) {
+        success = success && other.success;
+        warnings.insert(warnings.end(), other.warnings.begin(), other.warnings.end());
+        errors.insert(errors.end(), other.errors.begin(), other.errors.end());
+    }
+
+    std::string format_messages() const;
+};
 }  // namespace tt::scaleout_tools
 
 namespace tt::scaleout_tools::fsd::proto {
@@ -93,9 +113,31 @@ struct Node {
     std::unordered_map<PortType, std::vector<PortConnection>> inter_board_connections;
 };
 
-// Port connection types for flat storage
+// Port connection types
 using PortEndpoint = std::tuple<HostId, TrayId, PortId>;  // host_id, tray_id, port_id
 using PortConnection = std::pair<PortEndpoint, PortEndpoint>;
+
+// Resolved graph instance with concrete nodes (tree structure)
+struct ResolvedGraphInstance {
+    std::string template_name;  // Graph template name (e.g., "n300_t3k_superpod")
+    std::string instance_name;  // Instance name (e.g., "superpod1", "pod2")
+
+    // Direct child nodes at this level (not nested)
+    std::map<std::string, Node> nodes;
+
+    // Nested subgraphs (recursive structure)
+    std::map<std::string, std::unique_ptr<ResolvedGraphInstance>> subgraphs;
+
+    // Connections within this graph instance level only
+    std::unordered_map<PortType, std::vector<PortConnection>> internal_connections;
+
+    // Lookup structures for this level (for merge conflict detection)
+    std::map<PortEndpoint, PortEndpoint> endpoint_to_dest;
+    std::set<std::pair<PortEndpoint, PortEndpoint>> connection_pairs;
+
+    // Helper to update lookup structures when adding a connection
+    void add_connection(PortType port_type, const PortConnection& conn);
+};
 
 enum class CableLength { CABLE_0P5, CABLE_1, CABLE_2P5, CABLE_3, CABLE_5, UNKNOWN };
 
@@ -149,18 +191,33 @@ private:
     // Validate that each host_id is assigned to exactly one node
     void validate_host_id_uniqueness();
 
-    // Collect all host_id assignments (flat structure, no paths needed)
+    // Collect all host_id assignments (tree structure)
     void collect_host_assignments(std::unordered_map<HostId, std::string>& host_to_node_path);
+
+    void collect_host_assignments_from_resolved_graph(
+        const std::unique_ptr<ResolvedGraphInstance>& graph,
+        const std::string& path_prefix,
+        std::unordered_map<HostId, std::string>& host_to_node_path);
 
     // Utility function to generate logical chip connections from cluster hierarchy
     void generate_logical_chip_connections();
 
-    void generate_connections_from_flat_structure();
+    void generate_connections_from_resolved_graph(const std::unique_ptr<ResolvedGraphInstance>& graph);
 
     void populate_host_id_to_node();
 
+    void populate_host_id_from_resolved_graph(const std::unique_ptr<ResolvedGraphInstance>& graph);
+
+    // Recreate all nodes from templates to reset port availability for graph-level connections
+    void recreate_nodes_from_templates(ResolvedGraphInstance& graph);
+
     void get_all_connections_of_type(
         const std::vector<PortType>& port_types, std::vector<PortConnection>& conn_list) const;
+
+    void get_all_connections_of_type_from_resolved_graph(
+        const std::unique_ptr<ResolvedGraphInstance>& instance,
+        const std::vector<PortType>& port_types,
+        std::vector<PortConnection>& conn_list) const;
 
 private:
     // Helper functions for validation
@@ -189,12 +246,9 @@ private:
     // Caches for optimization
     std::unordered_map<std::string, Node> node_templates_;  // Templates with host_id=0
 
-    // Flat storage for all nodes (by name for merge validation, by host_id for lookup)
-    std::map<std::string, Node> nodes_;        // All nodes in the cluster (flat)
+    // Tree structure for resolved graph instances
+    std::unique_ptr<ResolvedGraphInstance> root_instance_;
     std::map<HostId, Node*> host_id_to_node_;  // Global lookup map for HostId -> Node reference
-
-    // Flat storage for all port connections
-    std::unordered_map<PortType, std::vector<PortConnection>> port_connections_;
 
     // Guaranteed to be sorted
     std::vector<LogicalChannelConnection> chip_connections_;
