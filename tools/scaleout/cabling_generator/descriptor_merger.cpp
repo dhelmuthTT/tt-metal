@@ -3,20 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "descriptor_merger.hpp"
+#include "cabling_generator.hpp"
 #include "protobuf_utils.hpp"
 
 #include <algorithm>
 #include <filesystem>
+#include <fmt/base.h>
 #include <fstream>
-#include <iostream>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <tt-logger/tt-logger.hpp>
 
 #include <google/protobuf/text_format.h>
 
 #include "protobuf/cluster_config.pb.h"
-#include "node/node.hpp"
+#include "node/node.hpp"  // For Topology enum
 #include "node/node_types.hpp"
 
 #include <enchantum/enchantum.hpp>
@@ -164,7 +166,7 @@ cabling_generator::proto::ClusterDescriptor DescriptorMerger::merge_descriptors(
     auto merged = merge_descriptors_impl(descriptors, validation_result);
 
     for (const auto& warning : validation_result.warnings) {
-        std::cerr << "WARNING: Descriptor merge: " << warning << std::endl;
+        log_warning(tt::LogDistributed, "Descriptor merge: {}", warning);
     }
 
     // Check if merge_descriptors_impl added any new errors
@@ -189,7 +191,7 @@ cabling_generator::proto::ClusterDescriptor DescriptorMerger::merge_descriptors_
 
     for (size_t i = 1; i < descriptors.size(); ++i) {
         const auto& source = descriptors[i];
-        const std::string source_identifier = "descriptor[" + std::to_string(i) + "]";
+        const std::string source_identifier = fmt::format("descriptor[{}]", i);
 
         // Handle graph_templates: merge internal_connections for existing templates
         for (const auto& [name, tmpl] : source.graph_templates()) {
@@ -364,10 +366,10 @@ bool DescriptorMerger::has_same_torus_architecture(const std::string& desc1, con
 }
 
 std::string DescriptorMerger::extract_torus_architecture(const std::string& desc) {
-    if (desc.find("WH_GALAXY") == 0) {
+    if (desc.starts_with("WH_GALAXY")) {
         return "WH_GALAXY";
     }
-    if (desc.find("BH_GALAXY") == 0) {
+    if (desc.starts_with("BH_GALAXY")) {
         return "BH_GALAXY";
     }
     return "";
@@ -377,40 +379,58 @@ bool DescriptorMerger::has_torus_variant(const std::string& desc, const std::str
     return desc.find(variant) != std::string::npos;
 }
 
-// Helper to get the combined torus type for merging
-NodeType get_combined_torus_type(const std::string& desc1, const std::string& desc2) {
-    const bool desc1_x = desc1.find("_X_TORUS") != std::string::npos;
-    const bool desc1_y = desc1.find("_Y_TORUS") != std::string::npos;
-    const bool desc1_xy = desc1.find("_XY_TORUS") != std::string::npos;
-    const bool desc2_x = desc2.find("_X_TORUS") != std::string::npos;
-    const bool desc2_y = desc2.find("_Y_TORUS") != std::string::npos;
-    const bool desc2_xy = desc2.find("_XY_TORUS") != std::string::npos;
+// Helper to get the combined torus type for merging (string overload)
+static NodeType get_combined_torus_type_impl(NodeType type1, NodeType type2) {
+    Topology topo1 = get_node_type_topology(type1);
+    Topology topo2 = get_node_type_topology(type2);
 
     // Determine if we need XY torus
-    const bool needs_x = desc1_x || desc1_xy || desc2_x || desc2_xy;
-    const bool needs_y = desc1_y || desc1_xy || desc2_y || desc2_xy;
+    const bool needs_x = topo1 == Topology::X_TORUS || topo1 == Topology::XY_TORUS || topo2 == Topology::X_TORUS ||
+                         topo2 == Topology::XY_TORUS;
+    const bool needs_y = topo1 == Topology::Y_TORUS || topo1 == Topology::XY_TORUS || topo2 == Topology::Y_TORUS ||
+                         topo2 == Topology::XY_TORUS;
+
+    // Determine architecture from type1 using string representation
+    const std::string type1_str = std::string(enchantum::to_string(type1));
+    const bool is_wh = type1_str.starts_with("WH_GALAXY");
+    const bool is_bh = type1_str.starts_with("BH_GALAXY");
 
     if (needs_x && needs_y) {
-        if (desc1.find("WH_GALAXY") == 0) {
+        if (is_wh) {
             return NodeType::WH_GALAXY_XY_TORUS;
-        } else if (desc1.find("BH_GALAXY") == 0) {
+        } else if (is_bh) {
             return NodeType::BH_GALAXY_XY_TORUS;
         }
     } else if (needs_x) {
-        if (desc1.find("WH_GALAXY") == 0) {
+        if (is_wh) {
             return NodeType::WH_GALAXY_X_TORUS;
-        } else if (desc1.find("BH_GALAXY") == 0) {
+        } else if (is_bh) {
             return NodeType::BH_GALAXY_X_TORUS;
         }
     } else if (needs_y) {
-        if (desc1.find("WH_GALAXY") == 0) {
+        if (is_wh) {
             return NodeType::WH_GALAXY_Y_TORUS;
-        } else if (desc1.find("BH_GALAXY") == 0) {
+        } else if (is_bh) {
             return NodeType::BH_GALAXY_Y_TORUS;
         }
     }
-    
-    throw std::runtime_error("Unable to determine combined torus type from: " + desc1 + " and " + desc2);
+
+    throw std::runtime_error(fmt::format(
+        "Unable to determine combined torus type from: {} and {}",
+        enchantum::to_string(type1),
+        enchantum::to_string(type2)));
+}
+
+// Helper to get the combined torus type for merging
+NodeType get_combined_torus_type(const std::string& desc1, const std::string& desc2) {
+    auto node_type1 = enchantum::cast<NodeType>(desc1, ttsl::ascii_caseless_comp);
+    auto node_type2 = enchantum::cast<NodeType>(desc2, ttsl::ascii_caseless_comp);
+
+    if (!node_type1.has_value() || !node_type2.has_value()) {
+        throw std::runtime_error(fmt::format("Unable to determine combined torus type from: {} and {}", desc1, desc2));
+    }
+
+    return get_combined_torus_type_impl(*node_type1, *node_type2);
 }
 
 void DescriptorMerger::add_torus_internal_connections(
@@ -418,31 +438,30 @@ void DescriptorMerger::add_torus_internal_connections(
     const std::string& target_desc,
     const std::string& source_desc,
     const std::string& child_name) {
-    
     // Get the combined torus type
     NodeType combined_type = get_combined_torus_type(target_desc, source_desc);
-    
+
     // Create a NodeDescriptor using node.cpp (which has all the torus connection logic!)
     auto combined_node_descriptor = create_node_descriptor(combined_type);
-    
+
     // Extract base architecture name (e.g., "WH_GALAXY" from "WH_GALAXY_XY_TORUS")
     std::string base_arch = extract_torus_architecture(target_desc);
-    
+
     // Only copy QSFP_DD connections (the torus-specific ones)
     // Don't copy LINKING_BOARD connections as those are already in the merged descriptor
     if (combined_node_descriptor.port_type_connections().contains("QSFP_DD")) {
         const auto& qsfp_connections = combined_node_descriptor.port_type_connections().at("QSFP_DD");
         auto& target_qsfp_connections = (*target_template.mutable_internal_connections())["QSFP_DD"];
-        
+
         for (const auto& conn : qsfp_connections.connections()) {
             auto* new_conn = target_qsfp_connections.add_connections();
-            
+
             // Copy port_a with child_name as path
             auto* port_a = new_conn->mutable_port_a();
             port_a->add_path(child_name);
             port_a->set_tray_id(conn.port_a().tray_id());
             port_a->set_port_id(conn.port_a().port_id());
-            
+
             // Copy port_b with child_name as path
             auto* port_b = new_conn->mutable_port_b();
             port_b->add_path(child_name);
@@ -490,9 +509,8 @@ MergeValidationResult DescriptorMerger::validate_host_consistency(const std::vec
         if (!first_host_count) {
             first_host_count = count;
         } else if (count != *first_host_count) {
-            result.add_warning(
-                "Host count mismatch between descriptors: " + std::to_string(*first_host_count) + " vs " +
-                std::to_string(count) + " hosts (file: " + path + ")");
+            result.add_warning(fmt::format(
+                "Host count mismatch between descriptors: {} vs {} hosts (file: {})", *first_host_count, count, path));
             break;
         }
     }

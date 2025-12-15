@@ -74,12 +74,19 @@ public:
 
     static bool is_directory(const std::string& path);
 
+    // Validation functions (public for use in CablingGenerator)
+    static MergeValidationResult validate_host_consistency(const std::vector<std::string>& descriptor_paths);
+    static void validate_structure_identity(
+        const cabling_generator::proto::ClusterDescriptor& desc1,
+        const std::string& file1,
+        const cabling_generator::proto::ClusterDescriptor& desc2,
+        const std::string& file2,
+        MergeValidationResult& result);
+
 private:
     static cabling_generator::proto::ClusterDescriptor merge_descriptors_impl(
         const std::vector<cabling_generator::proto::ClusterDescriptor>& descriptors,
         MergeValidationResult& validation_result);
-
-    static MergeValidationResult validate_host_consistency(const std::vector<std::string>& descriptor_paths);
 
 private:
     using ConnectionMap = std::map<ConnectionEndpoint, ConnectionEndpoint>;
@@ -106,13 +113,6 @@ private:
 
     static ConnectionEndpoint port_to_endpoint(
         const cabling_generator::proto::Port& port, const std::string& graph_template_name);
-
-    static void validate_structure_identity(
-        const cabling_generator::proto::ClusterDescriptor& desc1,
-        const std::string& file1,
-        const cabling_generator::proto::ClusterDescriptor& desc2,
-        const std::string& file2,
-        MergeValidationResult& result);
 
     static void validate_node_descriptors_identity(
         const cabling_generator::proto::ClusterDescriptor& desc1,
