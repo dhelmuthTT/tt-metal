@@ -133,7 +133,7 @@ operation::ProgramWithCallbacks untilize_multi_core_sub_core_grids(
     std::string compute_kernel(
         "ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/pack_untilize.cpp");
     if (!use_pack_untilize || a.dtype() == DataType::UINT16 ||
-        (a.dtype() == DataType::FLOAT32 && ntiles_per_block > MAX_PACK_UNTILIZE_WIDTH)) {
+        (a.dtype() == DataType::FLOAT32 && ntiles_per_block >= MAX_PACK_UNTILIZE_WIDTH)) {
         log_debug(tt::LogOp, "Using slow untilize.");
         compute_kernel =
             std::string("ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/untilize.cpp");
@@ -327,7 +327,7 @@ operation::ProgramWithCallbacks untilize_multi_core_parallelize_column(
     std::string compute_kernel(
         "ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/pack_untilize.cpp");
     if (!use_pack_untilize || a.dtype() == DataType::UINT16 ||
-        (a.dtype() == DataType::FLOAT32 && ntiles_per_block > MAX_PACK_UNTILIZE_WIDTH)) {
+        (a.dtype() == DataType::FLOAT32 && ntiles_per_block >= MAX_PACK_UNTILIZE_WIDTH)) {
         log_debug(tt::LogOp, "Using slow untilize.");
         compute_kernel =
             std::string("ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/untilize.cpp");
@@ -605,7 +605,7 @@ operation::ProgramWithCallbacks untilize_multi_core_block(
     // compute
     bool use_pack_kernel = true;
     if (!use_pack_untilize || a.dtype() == DataType::UINT16 ||
-        (a.dtype() == DataType::FLOAT32 && num_tiles_per_row > MAX_PACK_UNTILIZE_WIDTH)) {
+        (a.dtype() == DataType::FLOAT32 && num_tiles_per_row >= MAX_PACK_UNTILIZE_WIDTH)) {
         use_pack_kernel = false;
     }
     if (!core_range.empty()) {
@@ -829,7 +829,7 @@ operation::ProgramWithCallbacks untilize_multi_core_input_and_output_shard_type_
     }
     std::string compute_kernel;
     if (!use_pack_untilize || a.dtype() == DataType::UINT16 ||
-        (a.dtype() == DataType::FLOAT32 && num_tiles_per_block > MAX_PACK_UNTILIZE_WIDTH)) {
+        (a.dtype() == DataType::FLOAT32 && num_tiles_per_block >= MAX_PACK_UNTILIZE_WIDTH)) {
         log_debug(tt::LogOp, "Using slow untilize.");
         compute_kernel =
             std::string("ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/untilize.cpp");
@@ -1097,7 +1097,7 @@ operation::ProgramWithCallbacks untilize_multi_core(
     // Compute kernel file
     std::string compute_kernel;
     if (!use_pack_untilize || a.dtype() == DataType::UINT16 ||
-        (a.dtype() == DataType::FLOAT32 && num_tiles_per_input_block > MAX_PACK_UNTILIZE_WIDTH)) {
+        (a.dtype() == DataType::FLOAT32 && num_tiles_per_input_block >= MAX_PACK_UNTILIZE_WIDTH)) {
         log_debug(tt::LogOp, "Using slow untilize.");
         compute_kernel = std::string(
             "ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/untilize_variable_num_blocks.cpp");
@@ -1459,7 +1459,7 @@ operation::ProgramWithCallbacks untilize_single_core(
     std::string compute_kernel(
         "ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/pack_untilize.cpp");
     if (!use_pack_untilize || a.dtype() == DataType::UINT16 ||
-        (a.dtype() == DataType::FLOAT32 && num_tiles_per_block > MAX_PACK_UNTILIZE_WIDTH)) {
+        (a.dtype() == DataType::FLOAT32 && num_tiles_per_block >= MAX_PACK_UNTILIZE_WIDTH)) {
         log_debug(tt::LogOp, "Using slow untilize.");
         compute_kernel =
             std::string("ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/untilize.cpp");
