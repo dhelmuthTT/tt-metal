@@ -120,7 +120,7 @@ static std::vector<Tensor> pool2d_L1(
                 output_shape[1],
                 output_shape[2],
                 channels,
-                tt::constants::TILE_WIDTH,
+                8,
                 input_tensor.device()->compute_with_storage_grid_size(),
                 ShardOrientation::ROW_MAJOR,
                 false,
@@ -328,6 +328,7 @@ class Pool2dSliceAttr : public ttnn::operations::op_slicing::OpSliceAttr {
     Pool2DType pool_type;
     DataType dtype;
     TensorMemoryLayout shard_layout;
+    Layout input_layout;
     Layout output_layout;
     std::optional<DeviceComputeKernelConfig> compute_kernel_config;
     MeshDevice* device;
@@ -348,6 +349,7 @@ public:
         bool return_indices,
         Pool2DType pool_type,
         DataType dtype,
+        Layout input_layout,
         Layout output_layout,
         std::optional<DeviceComputeKernelConfig> compute_kernel_config,
         MeshDevice* device);
@@ -499,6 +501,7 @@ static std::vector<Tensor> pool2d_DRAM(
         return_indices,
         pool_type,
         dtype,
+        input_tensor_on_device.layout(),
         output_layout,
         compute_kernel_config,
         input_tensor_on_device.device());
@@ -714,6 +717,7 @@ Pool2dSliceAttr::Pool2dSliceAttr(
     bool return_indices,
     Pool2DType pool_type,
     DataType dtype,
+    Layout input_layout,
     Layout output_layout,
     std::optional<DeviceComputeKernelConfig> compute_kernel_config,
     MeshDevice* device) :
@@ -730,6 +734,7 @@ Pool2dSliceAttr::Pool2dSliceAttr(
     return_indices(return_indices),
     pool_type(pool_type),
     dtype(dtype),
+    input_layout(input_layout),
     output_layout(output_layout),
     compute_kernel_config(compute_kernel_config),
     device(device) {
@@ -835,11 +840,13 @@ tt::tt_metal::MemoryConfig Pool2dSliceAttr::get_input_memory_config(
         ttnn::Shape({batch_size, output_slice_height, output_slice_width, channels}),
         false,
         device->compute_with_storage_grid_size(),
-        Layout::TILE,
-        BufferType::L1 /* Setting to L1  & Tile Layout forces Tile Width alignment, which is what the pool op expects.
-                          Otherwise, it fails due to bug in halo on blackhole
-                          https://github.com/tenstorrent/tt-metal/issues/33082*/
-        ));
+        input_layout,
+        BufferType::DRAM,
+        std::nullopt,
+        std::nullopt,
+        false,
+        output_layout == tt::tt_metal::Layout::TILE,
+        output_layout == tt::tt_metal::Layout::TILE));
     return sliced_input_tensor_memory_config;
 }
 std::vector<ttnn::Tensor> Pool2dSliceAttr::run_L1_op(
