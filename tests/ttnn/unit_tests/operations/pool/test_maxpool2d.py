@@ -18,19 +18,24 @@ def tensor_map(request):
 HS = ttnn.TensorMemoryLayout.HEIGHT_SHARDED
 BS = ttnn.TensorMemoryLayout.BLOCK_SHARDED
 WS = ttnn.TensorMemoryLayout.WIDTH_SHARDED
+SliceWidth = ttnn.Op2dDRAMSliceWidth
+SliceHeight = ttnn.Op2dDRAMSliceHeight
 
 parameters = {
     "dram_slice_tests": {
         "in_dtype": [ttnn.bfloat16, ttnn.bfloat8_b],
         "input_specs": [
             # Contains following parameters
-            # [in_n, in_c, in_h, in_w, kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w, dilation_h, dilation_w, ceil_mode, num_slices, shard_layout]
-            [1, 128, 1024, 1024, 2, 2, 2, 2, 0, 0, 1, 1, False, 8, HS],
-            [1, 480, 256, 256, 3, 3, 2, 2, 1, 1, 1, 1, False, 8, BS],
-            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, False, 4, WS],
-            [1, 128, 1024, 1024, 2, 2, 2, 2, 0, 0, 1, 1, True, 8, HS],
-            [1, 480, 256, 256, 3, 3, 2, 2, 1, 1, 1, 1, True, 8, BS],
-            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, True, 4, WS],
+            # [in_n, in_c, in_h, in_w, kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w, dilation_h, dilation_w, ceil_mode, num_slices, shard_layout, slice_type]
+            [1, 128, 1024, 1024, 2, 2, 2, 2, 0, 0, 1, 1, False, 8, HS, SliceWidth],
+            [1, 480, 256, 256, 3, 3, 2, 2, 1, 1, 1, 1, False, 8, BS, SliceWidth],
+            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, False, 4, WS, SliceWidth],
+            [1, 128, 1024, 1024, 2, 2, 2, 2, 0, 0, 1, 1, True, 8, HS, SliceWidth],
+            [1, 480, 256, 256, 3, 3, 2, 2, 1, 1, 1, 1, True, 8, BS, SliceWidth],
+            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, True, 4, WS, SliceWidth],
+            [1, 256, 1024, 64, 1, 64, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceHeight],
+            [1, 256, 1024, 32, 1, 32, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceHeight],
+            [1, 256, 2048, 64, 1, 64, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceHeight],
         ],
     },
     "height_shard_tests": {
@@ -115,8 +120,9 @@ def test_max_pool2d_dram_slice(device, in_dtype, input_spec):
         ceil_mode,
         num_slices,
         shard_scheme,
+        slice_type,
     ) = input_spec
-    dram_slice_config = ttnn.Op2DSliceConfig(num_slices=num_slices, slice_type=ttnn.Op2dDRAMSliceWidth)
+    dram_slice_config = ttnn.Op2DSliceConfig(num_slices=num_slices, slice_type=slice_type)
     torch_tensor_map = {}
     run_max_pool2d(
         [in_n, in_c, in_h, in_w],
