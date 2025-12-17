@@ -356,12 +356,19 @@ public:
         std::tuple<Pool2dSliceAttr::IOShape, Pool2dSliceAttr::IOShape>,
         std::array<uint32_t, 4>,
         std::array<uint32_t, 2>>
-    get_input_slice_and_padding(IOShape output_slice_start, IOShape output_slice_end);
-    std::tuple<IOShape, IOShape> get_input_slice(IOShape output_slice_start, IOShape output_slice_end) override;
-    uint32_t get_L1_usage() override;
-    tt::tt_metal::MemoryConfig get_input_memory_config(IOShape output_slice_start, IOShape output_slice_end) override;
+    get_input_slice_and_padding(const IOShape& output_slice_start, const IOShape& output_slice_end);
+    std::tuple<IOShape, IOShape> get_input_slice(
+        const IOShape& output_slice_start, const IOShape& output_slice_end) override;
+    uint32_t get_L1_usage(
+        const IOShape& output_slice_start,
+        const IOShape& output_slice_end,
+        const op_slicing::Op2DSliceConfig& slice_config) override;
+    tt::tt_metal::MemoryConfig get_input_memory_config(
+        const IOShape& output_slice_start, const IOShape& output_slice_end) override;
     std::vector<ttnn::Tensor> run_L1_op(
-        const ttnn::Tensor& sliced_input_tensor, IOShape output_slice_start, IOShape output_slice_end) override;
+        const ttnn::Tensor& sliced_input_tensor,
+        const IOShape& output_slice_start,
+        const IOShape& output_slice_end) override;
     std::string name() override;
 };
 
@@ -746,7 +753,7 @@ std::tuple<
     std::tuple<Pool2dSliceAttr::IOShape, Pool2dSliceAttr::IOShape>,
     std::array<uint32_t, 4>,
     std::array<uint32_t, 2>>
-Pool2dSliceAttr::get_input_slice_and_padding(IOShape output_slice_start, IOShape output_slice_end) {
+Pool2dSliceAttr::get_input_slice_and_padding(const IOShape& output_slice_start, const IOShape& output_slice_end) {
     auto [output_slice_height_start, output_slice_width_start] = output_slice_start;
     auto [output_slice_height_end, output_slice_width_end] = output_slice_end;
     int input_slice_height_start = (output_slice_height_start * stride[0]) - padding_n4[0];
@@ -806,13 +813,18 @@ Pool2dSliceAttr::get_input_slice_and_padding(IOShape output_slice_start, IOShape
         this_ceil_pad};
 }
 std::tuple<Pool2dSliceAttr::IOShape, Pool2dSliceAttr::IOShape> Pool2dSliceAttr::get_input_slice(
-    IOShape output_slice_start, IOShape output_slice_end) {
+    const IOShape& output_slice_start, const IOShape& output_slice_end) {
     return std::get<0>(get_input_slice_and_padding(output_slice_start, output_slice_end));
 }
 
-uint32_t Pool2dSliceAttr::get_L1_usage() { return 0; }
+uint32_t Pool2dSliceAttr::get_L1_usage(
+    const IOShape& output_slice_start,
+    const IOShape& output_slice_end,
+    const op_slicing::Op2DSliceConfig& slice_config) {
+    return 0;
+}
 tt::tt_metal::MemoryConfig Pool2dSliceAttr::get_input_memory_config(
-    IOShape output_slice_start, IOShape output_slice_end) {
+    const IOShape& output_slice_start, const IOShape& output_slice_end) {
     auto [input_start, input_end] = get_input_slice(output_slice_start, output_slice_end);
     uint32_t input_slice_height = std::get<0>(input_end) - std::get<0>(input_start);
     uint32_t input_slice_width = std::get<1>(input_end) - std::get<1>(input_start);
@@ -835,7 +847,7 @@ tt::tt_metal::MemoryConfig Pool2dSliceAttr::get_input_memory_config(
     return sliced_input_tensor_memory_config;
 }
 std::vector<ttnn::Tensor> Pool2dSliceAttr::run_L1_op(
-    const ttnn::Tensor& sliced_input_tensor, IOShape output_slice_start, IOShape output_slice_end) {
+    const ttnn::Tensor& sliced_input_tensor, const IOShape& output_slice_start, const IOShape& output_slice_end) {
     auto [input_slice, this_slice_padding, this_ceil_pad] =
         get_input_slice_and_padding(output_slice_start, output_slice_end);
     auto [input_slice_start, input_slice_end] = input_slice;
