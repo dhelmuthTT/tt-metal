@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "op_slicing.hpp"
+#include <tt-logger/tt-logger.hpp>
 #include <ttnn/operations/core/core.hpp>
 #include <ttnn/operations/data_movement/untilize/untilize.hpp>
 #include <ttnn/operations/functions.hpp>
@@ -11,6 +12,7 @@
 #include <ttnn/tensor/tensor.hpp>
 #include <ttnn/operations/experimental/slice_write/slice_write.hpp>
 #include <ttnn/operations/experimental/padded_slice/padded_slice.hpp>
+#include "tt-metalium/math.hpp"
 namespace ttnn::operations::op_slicing {
 
 static uint32_t compute_L1_usage_for_slice_config(
@@ -246,7 +248,28 @@ void run_sliced_op(
     log_debug(tt::LogOp, "{} DRAM with Slice Config {}", op_slice_attr->name(), dram_slice_config);
     TT_FATAL(dram_slice_config.num_slices > 0, " Number of slices should be greater than 0 for DRAM Slicing");
 
+    uint32_t slice_rounding_value = 1;
+    if (output_layout == tt::tt_metal::Layout::TILE &&
+        dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_WIDTH) {
+        // In DRAM Slicing with Tile Layout, the width must be a multiple of TILE_HEIGHT.
+        slice_rounding_value = tt::constants::TILE_HEIGHT;
+    }
 
+    const uint32_t output_sliced_dim =
+        dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_HEIGHT ? output_height : output_width;
+
+    uint32_t max_num_slices = tt::div_up(output_sliced_dim, slice_rounding_value);
+    if (max_num_slices == 1) {
+        log_warning(
+            tt::LogOp,
+            "Op with Output Dimensions {}x{}, {} and {} can't be sliced. The L1 version of the op will be directly "
+            "called on the full input. ",
+            output_height,
+            output_width,
+            output_layout,
+            dram_slice_config.slice_type);
+    }
+    dram_slice_config.num_slices = std::min(dram_slice_config.num_slices, max_num_slices);
 
     if (dram_slice_config.num_slices == 1) {
         for(auto & this_output_tensor : output_tensors) {
@@ -264,16 +287,6 @@ void run_sliced_op(
 
         return;
     }
-
-    uint32_t slice_rounding_value = 1;
-    if (output_layout == tt::tt_metal::Layout::TILE &&
-        dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_WIDTH) {
-        // In DRAM Slicing with Tile Layout, the width must be a multiple of TILE_HEIGHT.
-        slice_rounding_value = tt::constants::TILE_HEIGHT;
-    }
-
-    const uint32_t output_sliced_dim =
-        dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_HEIGHT ? output_height : output_width;
 
     if (output_sliced_dim == 1) {
         dram_slice_config.num_slices = 1;

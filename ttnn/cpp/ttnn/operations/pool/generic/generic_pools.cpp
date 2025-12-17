@@ -798,10 +798,6 @@ Pool2dSliceAttr::get_input_slice_and_padding(const IOShape& output_slice_start, 
 
     if (output_slice_width % width_rounding_value != 0) {
         uint32_t additional_padded_width = width_rounding_value - (output_slice_width % width_rounding_value);
-        output_slice_width += additional_padded_width;
-    }
-    if (output_slice_width % width_rounding_value != 0) {
-        uint32_t additional_padded_width = width_rounding_value - (output_slice_width % width_rounding_value);
         log_trace(
             tt::LogOp, "Pool2d Slicing: Additional padding of {} added to the right side.", additional_padded_width);
         pad_right += additional_padded_width * stride[1];

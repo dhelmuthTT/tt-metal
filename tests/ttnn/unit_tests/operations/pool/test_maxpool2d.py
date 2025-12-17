@@ -29,13 +29,14 @@ parameters = {
             # [in_n, in_c, in_h, in_w, kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w, dilation_h, dilation_w, ceil_mode, num_slices, shard_layout, slice_type]
             [1, 128, 1024, 1024, 2, 2, 2, 2, 0, 0, 1, 1, False, 8, HS, SliceWidth],
             [1, 480, 256, 256, 3, 3, 2, 2, 1, 1, 1, 1, False, 8, BS, SliceWidth],
-            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, False, 4, WS, SliceWidth],
+            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, False, 4, WS, SliceHeight],
             [1, 128, 1024, 1024, 2, 2, 2, 2, 0, 0, 1, 1, True, 8, HS, SliceWidth],
             [1, 480, 256, 256, 3, 3, 2, 2, 1, 1, 1, 1, True, 8, BS, SliceWidth],
-            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, True, 4, WS, SliceWidth],
-            [1, 256, 1024, 64, 1, 64, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceHeight],
-            [1, 256, 1024, 32, 1, 32, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceHeight],
-            [1, 256, 2048, 64, 1, 64, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceHeight],
+            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, True, 4, WS, SliceHeight],
+            # Pooling dimension has been changed from width to height. Otherwise, with tile layout, the output width of 1 gets rounded up to 32.
+            [1, 256, 64, 1024, 64, 1, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceWidth],
+            [1, 256, 32, 1024, 32, 1, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceWidth],
+            [1, 256, 64, 2048, 64, 1, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceWidth],
         ],
     },
     "height_shard_tests": {
