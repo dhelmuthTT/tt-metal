@@ -66,6 +66,11 @@ struct Host {
     uint32_t shelf_u = 0;
     std::string motherboard;
     std::string node_type;
+
+    bool operator==(const Host& other) const {
+        return hostname == other.hostname && hall == other.hall && aisle == other.aisle && rack == other.rack &&
+               shelf_u == other.shelf_u && motherboard == other.motherboard && node_type == other.node_type;
+    }
 };
 
 struct LogicalChannelEndpoint {
@@ -160,6 +165,9 @@ public:
     // Validates host_id uniqueness and merges all structures
     // source_file is optional, used for error messages
     void merge(const CablingGenerator& other, const std::string& source_file = "");
+
+    // Equality comparison operator
+    bool operator==(const CablingGenerator& other) const;
 
     // Getters for all data
     const std::vector<Host>& get_deployment_hosts() const;
