@@ -384,7 +384,6 @@ class Generator:
 
         # Process the logits after all the prefill are done in data parallel mode
         if self.data_parallel > 1:
-            print(f"DP out_list: {out_list}")
             for idx, out in enumerate(out_list):
                 seq_len = int(prompt_lens[idx])
                 last_token_idx = seq_len - 1
