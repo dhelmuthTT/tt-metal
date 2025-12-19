@@ -208,7 +208,7 @@ TEST(Cluster, TestGenerateMultiHostClusterDescriptorFromFSD) {
 }
 
 // ============================================================================
-// Tests for multi-path and directory-based descriptor merging
+// Factory System Descriptor Tests
 // ============================================================================
 
 // Helper to create a 4-host deployment descriptor for merge tests
