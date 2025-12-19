@@ -97,7 +97,7 @@ std::ostream& operator<<(std::ostream& os, const PhysicalPortEndpoint& conn);
 using LogicalChannelConnection = std::pair<LogicalChannelEndpoint, LogicalChannelEndpoint>;
 using PhysicalChannelConnection = std::pair<PhysicalChannelEndpoint, PhysicalChannelEndpoint>;
 
-// Port connection types
+// Port connection types (graph-level connections between nodes)
 using PortEndpoint = std::tuple<HostId, TrayId, PortId>;  // host_id, tray_id, port_id
 using PortConnection = std::pair<PortEndpoint, PortEndpoint>;
 
@@ -113,12 +113,12 @@ struct Node {
 
     // Board-to-board connections within this node: PortType -> [(tray_id, port_id) <-> (tray_id, port_id)]
     using PortEndpoint = std::pair<TrayId, PortId>;
-    using PortConnection = std::pair<PortEndpoint, PortEndpoint>;  // Note: This is Node::PortConnection
+    using PortConnection = std::pair<PortEndpoint, PortEndpoint>;
     std::unordered_map<PortType, std::vector<PortConnection>> inter_board_connections;
 };
 
-// Normalize a connection pair so the smaller endpoint is always first (for consistent comparison)
-inline Node::PortConnection normalize_connection(const Node::PortConnection& conn) {
+// Normalize a node-level connection pair so the smaller endpoint is always first (for consistent comparison)
+inline Node::PortConnection normalize_node_connection(const Node::PortConnection& conn) {
     return (conn.first < conn.second) ? conn : Node::PortConnection(conn.second, conn.first);
 }
 

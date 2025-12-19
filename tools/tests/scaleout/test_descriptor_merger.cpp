@@ -357,6 +357,9 @@ protected:
         for (int i = 0; i < num_splits; i++) {
             const std::string path = output_dir + "/part" + std::to_string(i + 1) + ".textproto";
             write_proto_to_textproto(path, parts[i]);
+            if (!std::filesystem::exists(path)) {
+                throw std::runtime_error("Failed to write split descriptor: " + path);
+            }
             paths.push_back(path);
         }
 
@@ -608,23 +611,17 @@ TEST_F(DescriptorMergerTest, RejectMergingWormholeAndBlackholeTorusTogether) {
     create_torus_descriptor(test_dir + "wh_torus.textproto", "mixed_torus", "node1", "WH_GALAXY_X_TORUS", 0);
     create_torus_descriptor(test_dir + "bh_torus.textproto", "mixed_torus", "node1", "BH_GALAXY_X_TORUS", 0);
 
-    EXPECT_THROW(
-        {
-            try {
-                CablingGenerator merged_gen(test_dir, create_host_vector(1));
-                FAIL() << "Expected exception for different architectures";
-            } catch (const std::runtime_error& e) {
-                const std::string error_msg = e.what();
-                // Should mention structural mismatch (different node descriptor names)
-                EXPECT_TRUE(
-                    error_msg.find("structural") != std::string::npos ||
-                    error_msg.find("mismatch") != std::string::npos || error_msg.find("board") != std::string::npos)
-                    << "Error: " << error_msg;
-                throw;
-            }
-        },
-        std::runtime_error)
-        << "Merging WH and BH torus should fail (different architectures)";
+    try {
+        CablingGenerator merged_gen(test_dir, create_host_vector(1));
+        FAIL() << "Expected std::runtime_error for different architectures";
+    } catch (const std::runtime_error& e) {
+        const std::string error_msg = e.what();
+        // Should mention structural mismatch (different node descriptor names)
+        EXPECT_TRUE(
+            error_msg.find("structural") != std::string::npos || error_msg.find("mismatch") != std::string::npos ||
+            error_msg.find("board") != std::string::npos)
+            << "Error: " << error_msg;
+    }
 }
 
 TEST_F(DescriptorMergerTest, MergeTwoIdenticalXTorusDescriptors) {

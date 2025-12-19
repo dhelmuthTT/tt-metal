@@ -50,6 +50,46 @@ Descriptor load_descriptor_from_textproto(const std::string& file_path) {
     return descriptor;
 }
 
+// Helper function to check for duplicate endpoint in connection map and throw if found
+static void check_duplicate_endpoint(
+    const Node::PortEndpoint& endpoint,
+    const Node::PortEndpoint& new_dest,
+    const std::map<Node::PortEndpoint, Node::PortEndpoint>& endpoint_to_dest,
+    const std::string& context_name,
+    PortType port_type,
+    const std::string& source_description) {
+    if (endpoint_to_dest.count(endpoint)) {
+        throw std::runtime_error(fmt::format(
+            "Duplicate connection definition in {} for port type {} in {}: port (tray_id: {}, "
+            "port_id: {}) appears multiple times",
+            context_name,
+            enchantum::to_string(port_type),
+            source_description,
+            endpoint.first.get(),
+            endpoint.second.get()));
+    }
+}
+
+// Helper function to validate endpoint conflicts in connection map
+static void validate_endpoint_conflict(
+    const Node::PortEndpoint& endpoint,
+    const Node::PortEndpoint& expected_dest,
+    const std::map<Node::PortEndpoint, Node::PortEndpoint>& endpoint_to_dest,
+    const std::string& context_name) {
+    if (endpoint_to_dest.count(endpoint) && endpoint_to_dest.at(endpoint) != expected_dest) {
+        throw std::runtime_error(fmt::format(
+            "Connection conflict in {}: port (tray_id: {}, port_id: {}) "
+            "connected to both (tray_id: {}, port_id: {}) and (tray_id: {}, port_id: {})",
+            context_name,
+            endpoint.first.get(),
+            endpoint.second.get(),
+            endpoint_to_dest.at(endpoint).first.get(),
+            endpoint_to_dest.at(endpoint).second.get(),
+            expected_dest.first.get(),
+            expected_dest.second.get()));
+    }
+}
+
 // Helper function to mark ports as used for inter-board connections
 // Only marks ports that are currently available (skips already-marked ports)
 void mark_ports_used_for_connections(Node& node) {
@@ -91,34 +131,17 @@ static std::map<Node::PortEndpoint, Node::PortEndpoint> build_endpoint_map_for_p
     std::map<Node::PortEndpoint, Node::PortEndpoint> endpoint_to_dest;
     std::set<Node::PortConnection> seen_connections;
     for (const auto& [endpoint_a, endpoint_b] : connections) {
-        auto normalized = normalize_connection(Node::PortConnection(endpoint_a, endpoint_b));
+        auto normalized = normalize_node_connection(Node::PortConnection(endpoint_a, endpoint_b));
         if (seen_connections.count(normalized) > 0) {
             continue;  // Skip duplicate
         }
         seen_connections.insert(normalized);
 
-        if (endpoint_to_dest.count(endpoint_a)) {
-            // Single descriptor defining same connection twice - error
-            throw std::runtime_error(fmt::format(
-                "Duplicate connection definition in node template '{}' for port type {} in {}: port (tray_id: {}, "
-                "port_id: {}) appears multiple times",
-                node_template_name,
-                enchantum::to_string(port_type),
-                template_source,
-                endpoint_a.first.get(),
-                endpoint_a.second.get()));
-        }
-        if (endpoint_to_dest.count(endpoint_b)) {
-            // Single descriptor defining same connection twice - error
-            throw std::runtime_error(fmt::format(
-                "Duplicate connection definition in node template '{}' for port type {} in {}: port (tray_id: {}, "
-                "port_id: {}) appears multiple times",
-                node_template_name,
-                enchantum::to_string(port_type),
-                template_source,
-                endpoint_b.first.get(),
-                endpoint_b.second.get()));
-        }
+        check_duplicate_endpoint(
+            endpoint_a, endpoint_b, endpoint_to_dest, "node template '" + node_template_name + "'", port_type, template_source);
+        check_duplicate_endpoint(
+            endpoint_b, endpoint_a, endpoint_to_dest, "node template '" + node_template_name + "'", port_type, template_source);
+        
         endpoint_to_dest[endpoint_a] = endpoint_b;
         endpoint_to_dest[endpoint_b] = endpoint_a;
     }
@@ -222,10 +245,10 @@ static void merge_inter_board_connections(Node& target_template, const Node& sou
         // Use set to deduplicate connections
         std::set<Node::PortConnection> connection_set;
         for (const auto& conn : target_conns) {
-            connection_set.insert(normalize_connection(conn));
+            connection_set.insert(normalize_node_connection(conn));
         }
         for (const auto& conn : source_conns) {
-            connection_set.insert(normalize_connection(conn));
+            connection_set.insert(normalize_node_connection(conn));
         }
 
         // Write back deduplicated connections
@@ -439,30 +462,9 @@ Node build_node(
             Node::PortEndpoint endpoint_b = std::make_pair(board_b_id, port_b_id);
 
             // Check for conflicts: same endpoint connected to different destinations (within this port type)
-            if (endpoint_to_dest.count(endpoint_a) && endpoint_to_dest[endpoint_a] != endpoint_b) {
-                throw std::runtime_error(fmt::format(
-                    "Connection conflict in node descriptor '{}': port (tray_id: {}, port_id: {}) "
-                    "connected to both (tray_id: {}, port_id: {}) and (tray_id: {}, port_id: {})",
-                    node_descriptor_name,
-                    endpoint_a.first.get(),
-                    endpoint_a.second.get(),
-                    endpoint_to_dest[endpoint_a].first.get(),
-                    endpoint_to_dest[endpoint_a].second.get(),
-                    endpoint_b.first.get(),
-                    endpoint_b.second.get()));
-            }
-            if (endpoint_to_dest.count(endpoint_b) && endpoint_to_dest[endpoint_b] != endpoint_a) {
-                throw std::runtime_error(fmt::format(
-                    "Connection conflict in node descriptor '{}': port (tray_id: {}, port_id: {}) "
-                    "connected to both (tray_id: {}, port_id: {}) and (tray_id: {}, port_id: {})",
-                    node_descriptor_name,
-                    endpoint_b.first.get(),
-                    endpoint_b.second.get(),
-                    endpoint_to_dest[endpoint_b].first.get(),
-                    endpoint_to_dest[endpoint_b].second.get(),
-                    endpoint_a.first.get(),
-                    endpoint_a.second.get()));
-            }
+            validate_endpoint_conflict(endpoint_a, endpoint_b, endpoint_to_dest, "node descriptor '" + node_descriptor_name + "'");
+            validate_endpoint_conflict(endpoint_b, endpoint_a, endpoint_to_dest, "node descriptor '" + node_descriptor_name + "'");
+            
             endpoint_to_dest[endpoint_a] = endpoint_b;
             endpoint_to_dest[endpoint_b] = endpoint_a;
         }
@@ -696,14 +698,14 @@ static CablingGenerator build_from_directory(const std::string& dir_path, const 
 
     // Create the first CablingGenerator from the first file
     CablingGenerator merged(descriptor_files[0], deployment_arg);
-    std::string existing_source_file = descriptor_files[0];
+    std::string merged_source_description = descriptor_files[0];
 
     // Merge all remaining files into it
     for (size_t i = 1; i < descriptor_files.size(); ++i) {
         CablingGenerator other(descriptor_files[i], deployment_arg);
-        merged.merge(other, existing_source_file, descriptor_files[i]);
-        // After merge, the existing source is now the accumulated merge (use empty string to indicate merged)
-        existing_source_file = "";
+        // Pass the accumulated description of merged sources for clearer error messages
+        merged.merge(other, merged_source_description, descriptor_files[i]);
+        merged_source_description += ", " + descriptor_files[i];
     }
     return merged;
 }
@@ -733,7 +735,7 @@ std::vector<std::string> CablingGenerator::find_descriptor_files(const std::stri
         throw std::runtime_error("Error reading directory " + directory_path + ": " + e.what());
     }
 
-    // Sorting files so we dont have undeterministic order of files in the directory so it's easier to debug errors.
+    // Sorting files so we don't have non-deterministic order of files in the directory, making errors easier to debug.
     std::sort(files.begin(), files.end());
 
     if (files.empty()) {
@@ -962,19 +964,29 @@ static void merge_resolved_graph_instances(
                 }
             } else {
                 // Non-torus: validate inter_board_connections match exactly
-                // Build normalized sets for comparison
-                std::set<Node::PortConnection> target_set, source_set;
+                // Build normalized sets for comparison (build once per node, not per port type)
+                std::map<PortType, std::set<Node::PortConnection>> target_sets, source_sets;
+                
+                // Pre-build all sets for both target and source
                 for (const auto& [port_type, connections] : target.nodes[name].inter_board_connections) {
-                    if (!source_node.inter_board_connections.count(port_type)) {
+                    auto& target_set = target_sets[port_type];
+                    for (const auto& conn : connections) {
+                        target_set.insert(normalize_node_connection(conn));
+                    }
+                }
+                for (const auto& [port_type, connections] : source_node.inter_board_connections) {
+                    auto& source_set = source_sets[port_type];
+                    for (const auto& conn : connections) {
+                        source_set.insert(normalize_node_connection(conn));
+                    }
+                }
+                
+                // Now compare the sets
+                for (const auto& [port_type, target_set] : target_sets) {
+                    if (!source_sets.count(port_type)) {
                         continue;  // Port type not in source, skip
                     }
-                    for (const auto& conn : connections) {
-                        target_set.insert(normalize_connection(conn));
-                    }
-                    for (const auto& conn : source_node.inter_board_connections.at(port_type)) {
-                        source_set.insert(normalize_connection(conn));
-                    }
-                    if (target_set != source_set) {
+                    if (target_set != source_sets[port_type]) {
                         throw std::runtime_error(fmt::format(
                             "Node '{}' has conflicting inter_board_connections: {} and {} have different "
                             "inter-board connections (we only merge internal_connections, not inter_board_connections)",
@@ -982,8 +994,6 @@ static void merge_resolved_graph_instances(
                             (existing_source_file.empty() ? "merged descriptor" : existing_source_file),
                             (new_source_file.empty() ? "merged descriptor" : new_source_file)));
                     }
-                    target_set.clear();
-                    source_set.clear();
                 }
                 // Also check for port types in source that don't exist in target
                 for (const auto& [port_type, connections] : source_node.inter_board_connections) {
@@ -1222,7 +1232,7 @@ static bool compare_resolved_graph_instances(const ResolvedGraphInstance& lhs, c
                 lhs_set.insert(normalize_connection(conn));
             }
             for (const auto& conn : other_connections) {
-                rhs_set.insert(normalize_connection(conn));
+                rhs_set.insert(normalize_node_connection(conn));
             }
             if (lhs_set != rhs_set) {
                 return false;
@@ -1312,7 +1322,7 @@ bool CablingGenerator::operator==(const CablingGenerator& other) const {
                 lhs_set.insert(normalize_connection(conn));
             }
             for (const auto& conn : other_connections) {
-                rhs_set.insert(normalize_connection(conn));
+                rhs_set.insert(normalize_node_connection(conn));
             }
             if (lhs_set != rhs_set) {
                 return false;
