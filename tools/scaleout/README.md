@@ -96,7 +96,7 @@ For large systems (e.g., BH Exabox), you can organize cabling into multiple desc
 ```
 
 The tool will:
-1. Recursively find all `.textproto` files in the directory (sorted alphabetically)
+1. Find all `.textproto` files in the specified directory (sorted alphabetically)
 2. Merge all graph templates and connections
    - Validates structural compatibility (same node types, board configurations)
    - Allows cross-descriptor connections on different ports for fully-connected graphs

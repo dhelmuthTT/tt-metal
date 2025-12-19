@@ -85,7 +85,11 @@ protected:
     }
 
     // Helper to write a string to a textproto file
-    static void write_textproto(const std::string& path, const std::string& content) { std::ofstream(path) << content; }
+    static void write_textproto(const std::string& path, const std::string& content) {
+        std::ofstream ofs(path);
+        ofs << content;
+        ofs.flush();
+    }
 
     // Helper to write a protobuf message to a textproto file
     template <typename T>
@@ -498,23 +502,17 @@ TEST_F(DescriptorMergerTest, RejectMismatchedNodeTypes) {
     create_simple_descriptor(test_dir + "file1.textproto", "test_cluster", "node1", "WH_GALAXY_Y_TORUS");
     create_simple_descriptor(test_dir + "file2.textproto", "test_cluster", "node1", "N300_T3K_NODE");
 
-    EXPECT_THROW(
-        {
-            try {
-                CablingGenerator gen(test_dir, create_host_vector(1));
-                FAIL() << "Expected exception for incompatible node types";
-            } catch (const std::runtime_error& e) {
-                const std::string error_msg = e.what();
-                // Verify error message mentions structural mismatch
-                EXPECT_TRUE(
-                    error_msg.find("motherboard") != std::string::npos ||
-                    error_msg.find("board") != std::string::npos || error_msg.find("node") != std::string::npos)
-                    << "Error: " << error_msg;
-                throw;
-            }
-        },
-        std::runtime_error)
-        << "Incompatible node types should not merge";
+    try {
+        CablingGenerator gen(test_dir, create_host_vector(1));
+        FAIL() << "Expected std::runtime_error for incompatible node types";
+    } catch (const std::runtime_error& e) {
+        const std::string error_msg = e.what();
+        // Verify error message mentions structural mismatch
+        EXPECT_TRUE(
+            error_msg.find("motherboard") != std::string::npos || error_msg.find("board") != std::string::npos ||
+            error_msg.find("node") != std::string::npos)
+            << "Error: " << error_msg;
+    }
 }
 
 TEST_F(DescriptorMergerTest, AllowCrossDescriptorConnectionsOnDifferentPorts) {

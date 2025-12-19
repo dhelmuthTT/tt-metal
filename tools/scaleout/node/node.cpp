@@ -434,7 +434,7 @@ std::unique_ptr<NodeBase> create_node_instance(NodeType node_type) {
         case NodeType::BH_GALAXY_X_TORUS: return std::make_unique<BHGalaxyXTorusNode>();
         case NodeType::BH_GALAXY_Y_TORUS: return std::make_unique<BHGalaxyYTorusNode>();
         case NodeType::BH_GALAXY_XY_TORUS: return std::make_unique<BHGalaxyXYTorusNode>();
-        default: return nullptr;
+        default: throw std::runtime_error("Unknown node type: " + std::to_string(static_cast<int>(node_type)));
     }
 }
 
@@ -450,9 +450,6 @@ tt::scaleout_tools::cabling_generator::proto::NodeDescriptor create_node_descrip
 // Helper function to get topology for a NodeType (uses virtual function from node instances)
 Topology get_node_type_topology(NodeType node_type) {
     auto node = create_node_instance(node_type);
-    if (!node) {
-        return Topology::MESH;  // Unknown node types default to MESH
-    }
     return node->get_topology();
 }
 

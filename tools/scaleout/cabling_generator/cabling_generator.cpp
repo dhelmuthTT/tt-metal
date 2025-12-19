@@ -50,6 +50,26 @@ Descriptor load_descriptor_from_textproto(const std::string& file_path) {
     return descriptor;
 }
 
+// Helper function to mark ports as used for inter-board connections
+// Only marks ports that are currently available (skips already-marked ports)
+void mark_ports_used_for_connections(Node& node) {
+    for (const auto& [port_type, connections] : node.inter_board_connections) {
+        for (const auto& [board_a, board_b] : connections) {
+            // Check if port is still available before marking (may already be marked from template)
+            const auto& available_ports_a = node.boards.at(board_a.first).get_available_port_ids(port_type);
+            if (std::find(available_ports_a.begin(), available_ports_a.end(), board_a.second) !=
+                available_ports_a.end()) {
+                node.boards.at(board_a.first).mark_port_used(port_type, board_a.second);
+            }
+            const auto& available_ports_b = node.boards.at(board_b.first).get_available_port_ids(port_type);
+            if (std::find(available_ports_b.begin(), available_ports_b.end(), board_b.second) !=
+                available_ports_b.end()) {
+                node.boards.at(board_b.first).mark_port_used(port_type, board_b.second);
+            }
+        }
+    }
+}
+
 }  // anonymous namespace
 
 cabling_generator::proto::ClusterDescriptor load_cluster_descriptor(const std::string& file_path) {
@@ -825,25 +845,7 @@ static Node create_fresh_node_from_template(
                 // Copy inter_board_connections from source (they may have been merged from multiple files)
                 fresh_node.inter_board_connections = source_node.inter_board_connections;
                 // Re-mark ports as used for the merged inter-board connections
-                // (template already has original inter-board connections marked, but we need to mark
-                // any additional ones that were merged)
-                for (const auto& [port_type, connections] : fresh_node.inter_board_connections) {
-                    for (const auto& [board_a, board_b] : connections) {
-                        // Check if port is still available before marking (may already be marked from template)
-                        const auto& available_ports =
-                            fresh_node.boards.at(board_a.first).get_available_port_ids(port_type);
-                        if (std::find(available_ports.begin(), available_ports.end(), board_a.second) !=
-                            available_ports.end()) {
-                            fresh_node.boards.at(board_a.first).mark_port_used(port_type, board_a.second);
-                        }
-                        const auto& available_ports_b =
-                            fresh_node.boards.at(board_b.first).get_available_port_ids(port_type);
-                        if (std::find(available_ports_b.begin(), available_ports_b.end(), board_b.second) !=
-                            available_ports_b.end()) {
-                            fresh_node.boards.at(board_b.first).mark_port_used(port_type, board_b.second);
-                        }
-                    }
-                }
+                mark_ports_used_for_connections(fresh_node);
                 return fresh_node;
             }
         }
@@ -1001,12 +1003,7 @@ static void merge_resolved_graph_instances(
             // Preserve the existing inter_board_connections (don't merge, just keep what we have)
             new_node.inter_board_connections = target.nodes[name].inter_board_connections;
             // Re-mark ports as used for the merged inter-board connections
-            for (const auto& [port_type, connections] : new_node.inter_board_connections) {
-                for (const auto& [board_a, board_b] : connections) {
-                    new_node.boards.at(board_a.first).mark_port_used(port_type, board_a.second);
-                    new_node.boards.at(board_b.first).mark_port_used(port_type, board_b.second);
-                }
-            }
+            mark_ports_used_for_connections(new_node);
             target.nodes[name] = new_node;
         } else {
             // New node - create fresh from template to reset port availability for graph-level connections
@@ -1601,20 +1598,7 @@ void CablingGenerator::recreate_nodes_from_templates(ResolvedGraphInstance& grap
         fresh_node.host_id = node.host_id;
         fresh_node.inter_board_connections = node.inter_board_connections;
         // Re-mark ports as used for inter-board connections
-        for (const auto& [port_type, connections] : fresh_node.inter_board_connections) {
-            for (const auto& [board_a, board_b] : connections) {
-                const auto& available_ports_a = fresh_node.boards.at(board_a.first).get_available_port_ids(port_type);
-                if (std::find(available_ports_a.begin(), available_ports_a.end(), board_a.second) !=
-                    available_ports_a.end()) {
-                    fresh_node.boards.at(board_a.first).mark_port_used(port_type, board_a.second);
-                }
-                const auto& available_ports_b = fresh_node.boards.at(board_b.first).get_available_port_ids(port_type);
-                if (std::find(available_ports_b.begin(), available_ports_b.end(), board_b.second) !=
-                    available_ports_b.end()) {
-                    fresh_node.boards.at(board_b.first).mark_port_used(port_type, board_b.second);
-                }
-            }
-        }
+        mark_ports_used_for_connections(fresh_node);
         node = fresh_node;
     }
 
