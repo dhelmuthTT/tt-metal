@@ -4,10 +4,16 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <google/protobuf/text_format.h>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -29,6 +35,10 @@ enum class NodeType;
 
 namespace tt::scaleout_tools::fsd::proto {
     class FactorySystemDescriptor;
+}
+
+namespace tt::scaleout_tools::deployment::proto {
+class DeploymentDescriptor;
 }
 
 namespace tt::scaleout_tools {
@@ -223,6 +233,12 @@ private:
     std::vector<LogicalChannelConnection> chip_connections_;
     std::vector<Host> deployment_hosts_;
 };
+
+// Helper function for loading cluster descriptor from textproto file
+// Note: Implemented in cabling_generator.cpp
+[[nodiscard]] cabling_generator::proto::ClusterDescriptor load_cluster_descriptor(const std::string& file_path);
+
+[[nodiscard]] deployment::proto::DeploymentDescriptor load_deployment_descriptor(const std::string& file_path);
 
 }  // namespace tt::scaleout_tools
 

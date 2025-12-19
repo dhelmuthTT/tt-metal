@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "cabling_generator.hpp"
-#include "protobuf_utils.hpp"
 
 #include <board/board.hpp>
 #include <connector/connector.hpp>
@@ -30,6 +29,35 @@
 #include "protobuf/node_config.pb.h"
 
 namespace tt::scaleout_tools {
+
+namespace {
+
+// Generic helper for loading protobuf descriptors from textproto files
+template <typename Descriptor>
+Descriptor load_descriptor_from_textproto(const std::string& file_path) {
+    std::ifstream file(file_path);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file: " + file_path);
+    }
+
+    const std::string file_content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+    Descriptor descriptor;
+    if (!google::protobuf::TextFormat::ParseFromString(file_content, &descriptor)) {
+        throw std::runtime_error("Failed to parse textproto file: " + file_path);
+    }
+    return descriptor;
+}
+
+}  // anonymous namespace
+
+cabling_generator::proto::ClusterDescriptor load_cluster_descriptor(const std::string& file_path) {
+    return load_descriptor_from_textproto<cabling_generator::proto::ClusterDescriptor>(file_path);
+}
+
+deployment::proto::DeploymentDescriptor load_deployment_descriptor(const std::string& file_path) {
+    return load_descriptor_from_textproto<deployment::proto::DeploymentDescriptor>(file_path);
+}
 
 namespace {
 
@@ -723,9 +751,7 @@ CablingGenerator::CablingGenerator(
         deployment_hosts_ = std::move(merged.deployment_hosts_);
     } else {
         auto cluster_descriptor = load_cluster_descriptor(cluster_descriptor_path);
-        auto deployment_descriptor =
-            load_descriptor_from_textproto<tt::scaleout_tools::deployment::proto::DeploymentDescriptor>(
-                deployment_descriptor_path);
+        auto deployment_descriptor = load_deployment_descriptor(deployment_descriptor_path);
         root_instance_ = build_graph_instance_impl(
             cluster_descriptor.root_instance(), cluster_descriptor, &deployment_descriptor, "", node_templates_);
         validate_host_id_uniqueness();
