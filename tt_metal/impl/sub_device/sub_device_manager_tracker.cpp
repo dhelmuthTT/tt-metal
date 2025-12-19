@@ -32,6 +32,7 @@
 #include "tt_metal/impl/sub_device/sub_device_manager.hpp"
 #include "sub_device/sub_device_manager_tracker.hpp"
 #include "tt_metal/impl/allocator/allocator.hpp"
+#include "distributed/mesh_device_impl.hpp"
 
 namespace tt::tt_metal {
 
@@ -64,9 +65,9 @@ void SubDeviceManagerTracker::reset_sub_device_state(const std::unique_ptr<SubDe
     auto num_sub_devices = sub_device_manager->num_sub_devices();
     // Dynamic resolution of device types is unclean and poor design. This will be cleaned up
     // when MeshCommandQueue + CommandQueue are unified under the same API
-    if (dynamic_cast<distributed::MeshDevice*>(device_)) {
+    if (dynamic_cast<distributed::MeshDeviceImpl*>(device_)) {
         // Multi CQ support for MeshDevice is not currently available
-        distributed::MeshDevice* mesh_device = dynamic_cast<distributed::MeshDevice*>(device_);
+        distributed::MeshDeviceImpl* mesh_device = dynamic_cast<distributed::MeshDeviceImpl*>(device_);
         for (uint8_t cq_id = 0; cq_id < mesh_device->num_hw_cqs(); ++cq_id) {
             mesh_device->mesh_command_queue(cq_id).reset_worker_state(
                 cq_id == 0,
