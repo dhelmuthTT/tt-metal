@@ -7,7 +7,7 @@
 #include <board/board.hpp>
 #include <connector/connector.hpp>
 #include <node/node_types.hpp>
-#include <node/node.hpp>  // For Topology enum
+#include <node/node.hpp>
 
 #include <algorithm>
 #include <concepts>
@@ -40,7 +40,8 @@ Descriptor load_descriptor_from_textproto(const std::string& file_path) {
         throw std::runtime_error("Failed to open file: " + file_path);
     }
 
-    const std::string file_content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::string file_content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
 
     Descriptor descriptor;
     if (!google::protobuf::TextFormat::ParseFromString(file_content, &descriptor)) {
@@ -361,20 +362,14 @@ void create_port_connection(
     const auto& available_b = board_b.get_available_port_ids(port_type);
 
     if (std::find(available_a.begin(), available_a.end(), port_a_id) == available_a.end()) {
-        throw std::runtime_error(fmt::format(
-            "{} Port {} not available on board {} in host {}",
-            enchantum::to_string(port_type),
-            *port_a_id,
-            *board_a_id,
-            *host_a_id));
+        throw std::runtime_error(
+            std::string(enchantum::to_string(port_type)) + " Port " + std::to_string(*port_a_id) +
+            " not available on board " + std::to_string(*board_a_id) + " in host " + std::to_string(*host_a_id));
     }
     if (std::find(available_b.begin(), available_b.end(), port_b_id) == available_b.end()) {
-        throw std::runtime_error(fmt::format(
-            "{} Port {} not available on board {} in host {}",
-            enchantum::to_string(port_type),
-            *port_b_id,
-            *board_b_id,
-            *host_b_id));
+        throw std::runtime_error(
+            std::string(enchantum::to_string(port_type)) + " Port " + std::to_string(*port_b_id) +
+            " not available on board " + std::to_string(*board_b_id) + " in host " + std::to_string(*host_b_id));
     }
 
     if (board_a.get_arch() != board_b.get_arch()) {
@@ -564,16 +559,13 @@ std::unique_ptr<ResolvedGraphInstance> build_graph_instance_impl(
                 if (*host_id < deployment_descriptor->hosts().size()) {
                     const auto& deployment_host = deployment_descriptor->hosts()[*host_id];
                     if (!deployment_host.node_type().empty() && deployment_host.node_type() != node_descriptor_name) {
-                        throw std::runtime_error(fmt::format(
-                            "Node type mismatch for host {} (host_id {}): deployment specifies '{}' but cluster "
-                            "configuration expects '{}'",
-                            deployment_host.host(),
-                            *host_id,
-                            deployment_host.node_type(),
-                            node_descriptor_name));
+                        throw std::runtime_error(
+                            "Node type mismatch for host " + deployment_host.host() + " (host_id " +
+                            std::to_string(*host_id) + "): deployment specifies '" + deployment_host.node_type() +
+                            "' but cluster configuration expects '" + node_descriptor_name + "'");
                     }
                 } else {
-                    throw std::runtime_error(fmt::format("Host ID {} not found in deployment", *host_id));
+                    throw std::runtime_error("Host ID " + std::to_string(*host_id) + " not found in deployment");
                 }
             }
 
@@ -593,13 +585,13 @@ std::unique_ptr<ResolvedGraphInstance> build_graph_instance_impl(
     }
 
     // Process internal connections within this graph instance
-    for (const auto& [port_type_str, port_connections_proto] : template_def.internal_connections()) {
+    for (const auto& [port_type_str, port_connections] : template_def.internal_connections()) {
         auto port_type = enchantum::cast<PortType>(port_type_str, ttsl::ascii_caseless_comp);
         if (!port_type.has_value()) {
             throw std::runtime_error("Invalid port type: " + port_type_str);
         }
 
-        for (const auto& conn : port_connections_proto.connections()) {
+        for (const auto& conn : port_connections.connections()) {
             const auto& path_a = conn.port_a().path();
             const auto& path_b = conn.port_b().path();
             TrayId board_a_id = TrayId(conn.port_a().tray_id());
@@ -652,7 +644,7 @@ void populate_deployment_hosts_from_hostnames(
         HostId host_id = HostId(i);
         auto it = host_id_to_node.find(host_id);
         if (it == host_id_to_node.end()) {
-            throw std::runtime_error(fmt::format("Host ID {} not found in cluster configuration", i));
+            throw std::runtime_error("Host ID " + std::to_string(i) + " not found in cluster configuration");
         }
         deployment_hosts.emplace_back(Host{
             .hostname = hostnames[i],
@@ -665,14 +657,6 @@ void populate_deployment_hosts_from_hostnames(
 }
 
 // Helper to build from directory by merging multiple files
-// Note: Each file is built via the constructor (which calls build_graph_instance_impl),
-// then merged into the accumulated result. This ensures proper validation and processing
-// of each file before merging.
-//
-// IMPORTANT: The issue is that when we build individual files, generate_logical_chip_connections()
-// marks ports as used. When we merge, those boards still have ports marked as used.
-// The fix: When merging nodes, we need to create fresh nodes from templates instead of
-// copying nodes that have ports already marked as used from graph-level connections.
 template <typename DeploymentArg>
 static CablingGenerator build_from_directory(const std::string& dir_path, const DeploymentArg& deployment_arg) {
     auto descriptor_files = CablingGenerator::find_descriptor_files(dir_path);
