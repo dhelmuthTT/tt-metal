@@ -32,7 +32,7 @@ namespace tt::scaleout_tools {
 
 namespace {
 
-// Generic helper for loading protobuf descriptors from textproto files
+// Helper to load protobuf descriptors
 template <typename Descriptor>
 Descriptor load_descriptor_from_textproto(const std::string& file_path) {
     std::ifstream file(file_path);
@@ -463,6 +463,10 @@ Node build_node(
     // Now actually create the connections and mark ports as used
     for (const auto& [port_type_str, port_connections] : node_descriptor.port_type_connections()) {
         auto port_type = enchantum::cast<PortType>(port_type_str, ttsl::ascii_caseless_comp);
+        if (!port_type.has_value()) {
+            throw std::runtime_error("Invalid port type: " + port_type_str);
+        }
+
         for (const auto& conn : port_connections.connections()) {
             TrayId board_a_id = TrayId(conn.port_a().tray_id());
             PortId port_a_id = PortId(conn.port_a().port_id());
@@ -1461,11 +1465,9 @@ void CablingGenerator::collect_host_assignments_from_resolved_graph(
         std::string full_node_path = path_prefix.empty() ? node_name : path_prefix + "/" + node_name;
 
         if (host_to_node_path.count(host_id)) {
-            throw std::runtime_error(fmt::format(
-                "Host ID {} is assigned to multiple nodes: '{}' and '{}'",
-                *host_id,
-                host_to_node_path[host_id],
-                full_node_path));
+            throw std::runtime_error(
+                "Host ID " + std::to_string(*host_id) + " is assigned to multiple nodes: '" +
+                host_to_node_path[host_id] + "' and '" + full_node_path + "'");
         }
         host_to_node_path[host_id] = full_node_path;
     }
