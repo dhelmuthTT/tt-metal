@@ -10,7 +10,7 @@
 #include "compute_kernel_api/untilize.h"
 #include "compute_kernel_api/pack_untilize.h"
 #include "tt_metal/hw/inc/circular_buffer.h"
-#include "ttnn/cpp/ttnn/kernel_lib/tilize_helpers.h"
+#include "ttnn/cpp/ttnn/kernel_lib/tilize_helpers.hpp"
 
 namespace NAMESPACE {
 
