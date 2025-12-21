@@ -204,9 +204,14 @@ Tensor to_weight_special_padding_tile_layout(
         weight_matrix_cols =
             (uint32_t)std::ceil((double)weight_matrix_cols / (double)in1_block_w_datums) * in1_block_w_datums;
     }
+    log_info(tt::LogOp, "w_shape {}", w_shape);
     // height padding
     uint32_t inner_dim = enable_activation_reuse ? w_shape[1] * w_shape[2] * w_shape[3] : w_shape[1] * w_shape[3];
-    assert(in1_block_h_datums >= inner_dim);
+    TT_FATAL(
+        in1_block_h_datums >= inner_dim,
+        "Block height {} must be >= inner dimension {}",
+        in1_block_h_datums,
+        inner_dim);
     uint32_t block_height_padding = enable_activation_reuse ? 0 : in1_block_h_datums - inner_dim;
     auto weight_matrix_rows =
         enable_activation_reuse ? in1_block_h_datums : ((w_shape[1] * w_shape[3]) + block_height_padding) * w_shape[2];
@@ -1372,7 +1377,7 @@ static ttnn::Tensor prepare_conv_weights_internal(
     Shape weight_shape = weight_tensor.logical_shape();
     // In case of 1D convolution and 3D weight tensor, reinterpret it as 4D tensor
     if (weight_shape.rank() == 3 && params.input_height == 1) {
-        weight_tensor_ = ttnn::reshape(weight_tensor_, Shape({weight_shape[0], weight_shape[1], weight_shape[2], 1}));
+        weight_tensor_ = ttnn::reshape(weight_tensor_, Shape({weight_shape[0], weight_shape[1], 1, weight_shape[2]}));
     }
     validate_host_conv_weights(weight_tensor_);
     log_trace(tt::LogOp, "Prepare Conv Weights with params: {}", params);
