@@ -168,7 +168,7 @@ std::vector<CBInfo> get_cb_info(
     const tt::DataFormat partial_df = datatype_to_dataformat_converter(partial_dtype);
     const uint32_t partial_tile_size = tt::tile_size(partial_df);
 
-    const bool is_1d_conv = input_shape[0] != 1 && input_shape[1] == 1;
+    const bool is_1d_conv = input_shape[0] == 1 && input_shape[1] != 1;
 
     {
         // Weights CB
@@ -729,7 +729,7 @@ void post_conv2d_op_memory_checks(
         output_image_width,
         has_bias,
         is_1d_deptwise_conv(
-            groups, input_tensor_shape[3], output_channels, kernel_dims[1], output_image_width, has_bias),
+            groups, input_tensor_shape[3], output_channels, kernel_dims[0], input_tensor_shape[1], has_bias),
         input_channels_padded,
         skip_mcast.skip_activation_mcast);
 

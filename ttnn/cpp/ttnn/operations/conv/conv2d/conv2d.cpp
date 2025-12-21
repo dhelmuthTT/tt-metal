@@ -175,6 +175,7 @@ Result conv2d_L1(
         output_parallel_config,
         groups,
         opt_conv_op_block_config.act_block_h_ntiles,
+        input_height,
         input_width,
         mm_conv && auto_shard,
         bias_tensor.has_value(),

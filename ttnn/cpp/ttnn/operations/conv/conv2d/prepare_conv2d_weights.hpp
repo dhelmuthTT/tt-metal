@@ -126,6 +126,7 @@ struct Conv2dWeightsBiasPrepConfig {
         const std::optional<sliding_window::ParallelConfig>& output_parallel_config_,
         uint32_t groups_,
         uint32_t act_block_h_ntiles_,
+        uint32_t input_height_,
         uint32_t input_width_,
         bool interleaved_mm_conv,
         bool has_bias_ = false,
@@ -144,6 +145,7 @@ struct Conv2dWeightsBiasPrepConfig {
         output_parallel_config(output_parallel_config_),
         groups(groups_),
         act_block_h_ntiles(act_block_h_ntiles_),
+        input_height(input_height_),
         input_width(input_width_),
         has_bias(has_bias_),
         parameters_on_device(parameters_on_device_),
@@ -166,6 +168,7 @@ struct Conv2dWeightsBiasPrepConfig {
     const std::optional<sliding_window::ParallelConfig> output_parallel_config;
     const uint32_t groups;
     const uint32_t act_block_h_ntiles;
+    const uint32_t input_height;
     const uint32_t input_width;
     const bool has_bias;
     const bool parameters_on_device;
@@ -190,6 +193,7 @@ struct Conv2dWeightsBiasPrepConfig {
         "output_parallel_config",
         "groups",
         "act_block_h_ntiles",
+        "input_height",
         "input_width",
         "has_bias",
         "parameters_on_device",
@@ -209,6 +213,7 @@ struct Conv2dWeightsBiasPrepConfig {
             std::cref(this->output_parallel_config),
             std::cref(this->groups),
             std::cref(this->act_block_h_ntiles),
+            std::cref(this->input_height),
             std::cref(this->input_width),
             std::cref(this->has_bias),
             std::cref(this->parameters_on_device),

@@ -1118,7 +1118,7 @@ static Conv2dWeightsBiasPrepConfig setup_conv_prep_config(
     std::array<uint32_t, 4> padding_n4 = sliding_window::get_pair_n4_padding(padding);
     bool mm_conv = use_matmul_for_1x1_conv(kernel_size, stride, padding_n4, dilation, groups, conv_config);
     auto orig_stride = stride;
-    const bool is_conv1d = is_1d_conv(kernel_size[1], input_width);
+    const bool is_conv1d = is_1d_conv(kernel_size[0], input_height);
     conv_config.enable_kernel_stride_folding = auto_enable_kernel_folding(
         input_memory_config,
         input_layout,
@@ -1353,6 +1353,7 @@ static Conv2dWeightsBiasPrepConfig setup_conv_prep_config(
         output_parallel_config,
         groups,
         opt_conv_op_block_config.act_block_h_ntiles,
+        input_height,
         input_width,
         mm_conv && auto_shard,
         has_bias,
@@ -1370,7 +1371,7 @@ static ttnn::Tensor prepare_conv_weights_internal(
     ttnn::Tensor weight_tensor_ = weight_tensor;  // tensor to return
     Shape weight_shape = weight_tensor.logical_shape();
     // In case of 1D convolution and 3D weight tensor, reinterpret it as 4D tensor
-    if (weight_shape.rank() == 3 && params.input_width == 1) {
+    if (weight_shape.rank() == 3 && params.input_height == 1) {
         weight_tensor_ = ttnn::reshape(weight_tensor_, Shape({weight_shape[0], weight_shape[1], weight_shape[2], 1}));
     }
     validate_host_conv_weights(weight_tensor_);
@@ -1378,15 +1379,15 @@ static ttnn::Tensor prepare_conv_weights_internal(
     const auto& original_weights_shape = weight_tensor_.logical_shape();
     uint32_t original_weights_out_channels = original_weights_shape[0];
     uint32_t original_weights_in_channels = original_weights_shape[1];
-    uint32_t original_weights_window_w = original_weights_shape[3];
+    uint32_t original_weights_window_h = original_weights_shape[2];
 
-    const bool is_conv1d = is_1d_conv(original_weights_window_w, params.input_width);
+    const bool is_conv1d = is_1d_conv(original_weights_window_h, params.input_height);
     const bool is_conv_1d_depthwise_conv = is_1d_deptwise_conv(
         params.groups,
         original_weights_in_channels * params.groups,
         original_weights_out_channels,
-        original_weights_window_w,
-        params.input_width,
+        original_weights_window_h,
+        params.input_height,
         params.has_bias);
     // Convert weight tensor to 0 padded shape if groups > 1
     if (!is_conv1d and params.groups > 1) {

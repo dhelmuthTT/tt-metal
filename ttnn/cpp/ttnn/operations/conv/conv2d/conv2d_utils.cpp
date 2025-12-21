@@ -510,17 +510,17 @@ bool use_matmul_for_1x1_conv(
            (not is_width_sharded);
 }
 
-bool is_1d_conv(uint32_t kernel_width, uint32_t image_width) { return kernel_width == 1 && image_width == 1; }
+bool is_1d_conv(uint32_t kernel_height, uint32_t image_height) { return kernel_height == 1 && image_height == 1; }
 
 bool is_1d_deptwise_conv(
     uint32_t groups,
     uint32_t input_channels,
     uint32_t output_channels,
-    uint32_t kernel_width,
-    uint32_t image_width,
+    uint32_t kernel_height,
+    uint32_t image_height,
     bool has_bias) {
     bool is_depthwise_conv = groups == input_channels && groups == output_channels;
-    return is_depthwise_conv && is_1d_conv(kernel_width, image_width) && !has_bias;
+    return is_depthwise_conv && is_1d_conv(kernel_height, image_height) && !has_bias;
 }
 
 SkipMcast conv_skip_mcast(const Conv2dParallelizationConfig& parallelization_config, TensorMemoryLayout memory_layout) {
@@ -927,7 +927,7 @@ core_count_and_size calculate_L1_usage_for_conv_op(
     const uint32_t input_datum_size = conv_input_dtype == tt::tt_metal::DataType::FLOAT32 ? 4 : 2;
 
     const bool conv_is_1d_deptwise =
-        is_1d_deptwise_conv(groups, in_channels, out_channels, kernel_size[1], input_width, enable_bias);
+        is_1d_deptwise_conv(groups, in_channels, out_channels, kernel_size[0], input_height, enable_bias);
 
     const uint32_t input_channels_alignment =
         get_input_channels_alignment(shard_layout, input_layout, false, is_mm_conv, std::nullopt);
@@ -1092,7 +1092,7 @@ Conv2dConfig determine_conv_config_for_auto_shard(
         return conv_config;
     }
     const bool conv_is_1d_deptwise =
-        is_1d_deptwise_conv(groups, in_channels, out_channels, kernel_size[1], input_width, enable_bias);
+        is_1d_deptwise_conv(groups, in_channels, out_channels, kernel_size[0], input_height, enable_bias);
 
     auto get_l1_usage_for_sharding = [&](TensorMemoryLayout shard_layout, const Conv2dConfig& conv_config) {
         return calculate_L1_usage_for_conv_op(

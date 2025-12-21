@@ -306,7 +306,7 @@ Conv2dShardedProgramFactory::cached_program_t Conv2dShardedProgramFactory::creat
     }
 
     const bool is_conv_1d_depthwise_conv =
-        is_1d_deptwise_conv(groups, ashape[3], output_channels, filter_w, ashape[2], has_bias);
+        is_1d_deptwise_conv(groups, ashape[3], output_channels, filter_h, ashape[1], has_bias);
 
     const bool enable_split_reader =
         is_split_reader_supported(a.memory_config().memory_layout(), is_conv_1d_depthwise_conv, act_block_h_ntiles) &&
