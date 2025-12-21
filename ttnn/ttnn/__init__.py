@@ -287,6 +287,9 @@ from ttnn.profiler import (
 # TODO: remove this after the distributed module is fully integrated
 from ttnn.distributed import *
 
+# Import distributed_context module from C++ bindings
+from ttnn._ttnn import distributed_context
+
 from ttnn.core import (
     set_printoptions,
     has_storage_type_of,

@@ -394,6 +394,7 @@ list(
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn-${PY_BINDING}/cluster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn-${PY_BINDING}/core.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn-${PY_BINDING}/device.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn-${PY_BINDING}/distributed_context.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn-${PY_BINDING}/events.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn-${PY_BINDING}/fabric.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn-${PY_BINDING}/global_circular_buffer.cpp
