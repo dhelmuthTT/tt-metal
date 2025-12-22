@@ -285,7 +285,9 @@ protected:
         const std::string& output_dir,
         const std::string& template_name = "",
         int num_splits = 2) {
-        EXPECT_GT(num_splits, 1) << "num_splits must be greater than 1";
+        if (num_splits < 2) {
+            throw std::runtime_error("num_splits must be at least 2");
+        }
 
         std::ifstream file(source_path);
         EXPECT_TRUE(file.is_open()) << "Failed to open " << source_path;
@@ -850,18 +852,7 @@ TEST_F(DescriptorMergerTest, MergeBHXTorusAndBHYTorusIntoXYTorus) {
 TEST_F(DescriptorMergerTest, OperatorEqualityReflexive) {
     // Test that a CablingGenerator is equal to itself (reflexive property)
     const std::string test_dir = create_test_dir("equality_reflexive");
-    write_textproto(test_dir + "test.textproto", R"(
-graph_templates {
-  key: "test_graph"
-  value {
-    children { key: "node1" value { node_type: "WH_GALAXY" } }
-  }
-}
-root_instance {
-  template_name: "test_graph"
-  child_mappings { key: "node1" value { host_id: 0 } }
-}
-)");
+    create_simple_descriptor(test_dir + "test.textproto", "test_graph", "node1", "WH_GALAXY", 0);
 
     CablingGenerator gen(test_dir + "test.textproto", create_host_vector(1));
     EXPECT_EQ(gen, gen) << "CablingGenerator should be equal to itself";
@@ -870,18 +861,7 @@ root_instance {
 TEST_F(DescriptorMergerTest, OperatorEqualitySymmetric) {
     // Test that if A == B, then B == A (symmetric property)
     const std::string test_dir = create_test_dir("equality_symmetric");
-    write_textproto(test_dir + "test.textproto", R"(
-graph_templates {
-  key: "test_graph"
-  value {
-    children { key: "node1" value { node_type: "WH_GALAXY" } }
-  }
-}
-root_instance {
-  template_name: "test_graph"
-  child_mappings { key: "node1" value { host_id: 0 } }
-}
-)");
+    create_simple_descriptor(test_dir + "test.textproto", "test_graph", "node1", "WH_GALAXY", 0);
 
     CablingGenerator gen1(test_dir + "test.textproto", create_host_vector(1));
     CablingGenerator gen2(test_dir + "test.textproto", create_host_vector(1));
@@ -894,31 +874,8 @@ TEST_F(DescriptorMergerTest, OperatorInequalityDifferentNodeTypes) {
     // Test that generators with different node types are not equal
     const std::string test_dir = create_test_dir("inequality_node_types");
 
-    write_textproto(test_dir + "wh.textproto", R"(
-graph_templates {
-  key: "test_graph"
-  value {
-    children { key: "node1" value { node_type: "WH_GALAXY" } }
-  }
-}
-root_instance {
-  template_name: "test_graph"
-  child_mappings { key: "node1" value { host_id: 0 } }
-}
-)");
-
-    write_textproto(test_dir + "bh.textproto", R"(
-graph_templates {
-  key: "test_graph"
-  value {
-    children { key: "node1" value { node_type: "BH_GALAXY" } }
-  }
-}
-root_instance {
-  template_name: "test_graph"
-  child_mappings { key: "node1" value { host_id: 0 } }
-}
-)");
+    create_simple_descriptor(test_dir + "wh.textproto", "test_graph", "node1", "WH_GALAXY", 0);
+    create_simple_descriptor(test_dir + "bh.textproto", "test_graph", "node1", "BH_GALAXY", 0);
 
     CablingGenerator wh_gen(test_dir + "wh.textproto", create_host_vector(1));
     CablingGenerator bh_gen(test_dir + "bh.textproto", create_host_vector(1));
@@ -930,52 +887,10 @@ TEST_F(DescriptorMergerTest, OperatorInequalityDifferentConnections) {
     // Test that generators with different internal connections are not equal
     const std::string test_dir = create_test_dir("inequality_connections");
 
-    const std::string base_proto = R"(
-graph_templates {
-  key: "test_graph"
-  value {
-    children { key: "node1" value { node_type: "WH_GALAXY" } }
-    children { key: "node2" value { node_type: "WH_GALAXY" } }
-  }
-}
-root_instance {
-  template_name: "test_graph"
-  child_mappings { key: "node1" value { host_id: 0 } }
-  child_mappings { key: "node2" value { host_id: 1 } }
-  internal_connections {
-    port_type: QSFP_DD
-    connections {
-      port_a { path: "node1" tray_id: 1 port_id: 0 }
-      port_b { path: "node2" tray_id: 1 port_id: 0 }
-    }
-  }
-}
-)";
-
-    const std::string different_conn_proto = R"(
-graph_templates {
-  key: "test_graph"
-  value {
-    children { key: "node1" value { node_type: "WH_GALAXY" } }
-    children { key: "node2" value { node_type: "WH_GALAXY" } }
-  }
-}
-root_instance {
-  template_name: "test_graph"
-  child_mappings { key: "node1" value { host_id: 0 } }
-  child_mappings { key: "node2" value { host_id: 1 } }
-  internal_connections {
-    port_type: QSFP_DD
-    connections {
-      port_a { path: "node1" tray_id: 1 port_id: 1 }
-      port_b { path: "node2" tray_id: 1 port_id: 1 }
-    }
-  }
-}
-)";
-
-    write_textproto(test_dir + "conn1.textproto", base_proto);
-    write_textproto(test_dir + "conn2.textproto", different_conn_proto);
+    create_two_node_descriptor_with_connection(
+        test_dir + "conn1.textproto", "test_graph", "WH_GALAXY", "WH_GALAXY", "node2", 1, 1, 1, 1);
+    create_two_node_descriptor_with_connection(
+        test_dir + "conn2.textproto", "test_graph", "WH_GALAXY", "WH_GALAXY", "node2", 1, 2, 1, 2);
 
     CablingGenerator gen1(test_dir + "conn1.textproto", create_host_vector(2));
     CablingGenerator gen2(test_dir + "conn2.textproto", create_host_vector(2));
@@ -987,33 +902,9 @@ TEST_F(DescriptorMergerTest, OperatorInequalityDifferentHostCount) {
     // Test that generators with different number of nodes are not equal
     const std::string test_dir = create_test_dir("inequality_host_count");
 
-    write_textproto(test_dir + "one_node.textproto", R"(
-graph_templates {
-  key: "test_graph"
-  value {
-    children { key: "node1" value { node_type: "WH_GALAXY" } }
-  }
-}
-root_instance {
-  template_name: "test_graph"
-  child_mappings { key: "node1" value { host_id: 0 } }
-}
-)");
-
-    write_textproto(test_dir + "two_nodes.textproto", R"(
-graph_templates {
-  key: "test_graph"
-  value {
-    children { key: "node1" value { node_type: "WH_GALAXY" } }
-    children { key: "node2" value { node_type: "WH_GALAXY" } }
-  }
-}
-root_instance {
-  template_name: "test_graph"
-  child_mappings { key: "node1" value { host_id: 0 } }
-  child_mappings { key: "node2" value { host_id: 1 } }
-}
-)");
+    create_simple_descriptor(test_dir + "one_node.textproto", "test_graph", "node1", "WH_GALAXY", 0);
+    create_two_node_descriptor_with_connection(
+        test_dir + "two_nodes.textproto", "test_graph", "WH_GALAXY", "WH_GALAXY", "node2");
 
     CablingGenerator gen1(test_dir + "one_node.textproto", create_host_vector(1));
     CablingGenerator gen2(test_dir + "two_nodes.textproto", create_host_vector(2));
