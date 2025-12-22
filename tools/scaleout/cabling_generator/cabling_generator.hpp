@@ -4,16 +4,10 @@
 
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <google/protobuf/text_format.h>
 #include <map>
 #include <memory>
-#include <optional>
 #include <set>
-#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -25,13 +19,7 @@
 
 namespace tt::scaleout_tools::cabling_generator::proto {
 class ClusterDescriptor;
-class GraphTemplate;
-class ChildInstance;
 }  // namespace tt::scaleout_tools::cabling_generator::proto
-
-namespace tt::scaleout_tools {
-enum class NodeType;
-}  // namespace tt::scaleout_tools
 
 namespace tt::scaleout_tools::fsd::proto {
     class FactorySystemDescriptor;
@@ -101,11 +89,6 @@ using PhysicalChannelConnection = std::pair<PhysicalChannelEndpoint, PhysicalCha
 using PortEndpoint = std::tuple<HostId, TrayId, PortId>;  // host_id, tray_id, port_id
 using PortConnection = std::pair<PortEndpoint, PortEndpoint>;
 
-// Normalize a graph-level connection pair so the smaller endpoint is always first
-inline PortConnection normalize_connection(const PortConnection& conn) {
-    return (conn.first < conn.second) ? conn : PortConnection(conn.second, conn.first);
-}
-
 struct Node {
     std::string motherboard;
     std::map<TrayId, Board> boards;
@@ -161,16 +144,12 @@ public:
 
     CablingGenerator() = default;
 
-    // Merge another CablingGenerator into this one
-    // Validates host_id uniqueness and merges all structures
-    // source_file is optional, used for error messages
-    void merge(
-        const CablingGenerator& other,
-        const std::string& existing_source_file = "",
-        const std::string& new_source_file = "");
-
     // Equality comparison operator
     bool operator==(const CablingGenerator& other) const;
+
+    // Friend function to allow build_from_directory to access private merge
+    template <typename DeploymentArg>
+    friend CablingGenerator build_from_directory(const std::string& dir_path, const DeploymentArg& deployment_arg);
 
     // Getters for all data
     const std::vector<Host>& get_deployment_hosts() const;
@@ -185,11 +164,18 @@ public:
     // Method to emit cabling guide CSV
     void emit_cabling_guide_csv(const std::string& output_path, bool loc_info = true) const;
 
-    // Utility functions for directory and file handling
-    static bool is_directory(const std::string& path);
-    static std::vector<std::string> find_descriptor_files(const std::string& directory_path);
-
 private:
+    // Merge another descriptor file into this CablingGenerator
+    // Creates CablingGenerator internally and merges it
+    // existing_sources: accumulated list of previously merged files (for error messages)
+    // new_file_path: path to the new file being merged in (for error messages)
+    // deployment_arg: either deployment descriptor path or vector of Host objects
+    template <typename DeploymentArg>
+    void merge(
+        const std::string& new_file_path, const DeploymentArg& deployment_arg, const std::string& existing_sources);
+
+    // Utility functions for directory and file handling
+    static std::vector<std::string> find_descriptor_files(const std::string& directory_path);
     // Validate that each host_id is assigned to exactly one node
     void validate_host_id_uniqueness();
 
@@ -221,8 +207,7 @@ private:
         const std::vector<PortType>& port_types,
         std::vector<PortConnection>& conn_list) const;
 
-private:
-    // Helper to add a connection and update lookup structures
+    // Member variables
     std::unordered_map<std::string, Node> node_templates_;  // Templates with host_id=0
 
     // Tree structure for resolved graph instances
@@ -233,12 +218,6 @@ private:
     std::vector<LogicalChannelConnection> chip_connections_;
     std::vector<Host> deployment_hosts_;
 };
-
-// Helper function for loading cluster descriptor from textproto file
-// Note: Implemented in cabling_generator.cpp
-[[nodiscard]] cabling_generator::proto::ClusterDescriptor load_cluster_descriptor(const std::string& file_path);
-
-[[nodiscard]] deployment::proto::DeploymentDescriptor load_deployment_descriptor(const std::string& file_path);
 
 }  // namespace tt::scaleout_tools
 
