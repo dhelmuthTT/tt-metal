@@ -260,7 +260,7 @@ void MAIN {
                      * Partial reduce_sum is used to push the final row_reduction within a tile
                      * outside of the loop over K chunks.
                      */
-                    transpose_tiles_inplace(cb_qk_im, Sq_chunk_t * Sk_chunk_t);
+                    // transpose_tiles_inplace(cb_qk_im, Sq_chunk_t * Sk_chunk_t);
                     transpose_tiles_inplace(alias_cur_max, Sq_chunk_t);
                     sub_exp_block_bcast_cols_inplace<cb_qk_im, Sq_chunk_t, Sk_chunk_t, scale_fp32, true>(
                         alias_cur_max, alias_cur_sum);
