@@ -21,10 +21,10 @@ Conv2dL1Full = Conv2dSliceConfig.SliceTypeEnum.L1Full
 Conv2dL1FullSliceConfig = Conv2dSliceConfig(slice_type=Conv2dL1Full)
 
 Op2DSliceConfig = ttnn._ttnn.operations.sliding_window.Op2DSliceConfig
-Op2dDRAMSliceHeight = Op2DSliceConfig.SliceTypeEnum.DRAMSliceHeight
-Op2dDRAMSliceWidth = Op2DSliceConfig.SliceTypeEnum.DRAMSliceWidth
-Op2dL1Full = Op2DSliceConfig.SliceTypeEnum.L1Full
-Op2dL1FullSliceConfig = Op2DSliceConfig(slice_type=Op2dL1Full)
+Op2DDRAMSliceHeight = Op2DSliceConfig.SliceTypeEnum.DRAMSliceHeight
+Op2DDRAMSliceWidth = Op2DSliceConfig.SliceTypeEnum.DRAMSliceWidth
+Op2DL1Full = Op2DSliceConfig.SliceTypeEnum.L1Full
+Op2DL1FullSliceConfig = Op2DSliceConfig(slice_type=Op2DL1Full)
 
 
 def get_conv_output_dim(input, window, stride=1, pad=0, dilation=1):

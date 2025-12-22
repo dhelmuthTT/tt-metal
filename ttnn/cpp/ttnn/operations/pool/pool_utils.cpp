@@ -458,13 +458,11 @@ void validate_input_params(
 
     // check that padding is not excessive (should not be more than half the kernel size)
     TT_FATAL(
-        pad_top <= kernel_size[0] / 2 && pad_bottom <= kernel_size[0] / 2 && pad_left <= kernel_size[1] / 2 &&
-            pad_right <= kernel_size[1] / 2,
-        "Pool2D: Padding ({}, {}, {}, {}) should not exceed half of kernel size ({}, {})",
+        pad_top <= kernel_size[0] / 2 && pad_bottom <= kernel_size[0] / 2 && pad_left <= kernel_size[1] / 2,
+        "Pool2D: Padding ({}, {}, {}) should not exceed half of kernel size ({}, {})",
         pad_top,
         pad_bottom,
         pad_left,
-        pad_right,
         kernel_size[0],
         kernel_size[1]);
 

@@ -18,8 +18,8 @@ def tensor_map(request):
 HS = ttnn.TensorMemoryLayout.HEIGHT_SHARDED
 BS = ttnn.TensorMemoryLayout.BLOCK_SHARDED
 WS = ttnn.TensorMemoryLayout.WIDTH_SHARDED
-SliceWidth = ttnn.Op2dDRAMSliceWidth
-SliceHeight = ttnn.Op2dDRAMSliceHeight
+SliceWidth = ttnn.Op2DDRAMSliceWidth
+SliceHeight = ttnn.Op2DDRAMSliceHeight
 
 parameters = {
     "dram_slice_tests": {
@@ -32,7 +32,7 @@ parameters = {
             [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, False, 4, WS, SliceHeight],
             [1, 128, 1024, 1024, 2, 2, 2, 2, 0, 0, 1, 1, True, 8, HS, SliceWidth],
             [1, 480, 256, 256, 3, 3, 2, 2, 1, 1, 1, 1, True, 8, BS, SliceWidth],
-            [1, 32768, 32, 32, 2, 2, 1, 1, 0, 0, 1, 1, True, 4, WS, SliceHeight],
+            [1, 256, 81, 81, 2, 2, 2, 2, 0, 0, 1, 1, True, 2, HS, SliceHeight],
             # Pooling dimension has been changed from width to height. Otherwise, with tile layout, the output width of 1 gets rounded up to 32.
             [1, 256, 64, 1024, 64, 1, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceWidth],
             [1, 256, 32, 1024, 32, 1, 1, 1, 0, 0, 1, 1, False, 8, BS, SliceWidth],
@@ -136,7 +136,7 @@ def test_max_pool2d_dram_slice(device, in_specs, input_spec):
         torch_tensor_map,
         in_dtype,
         shard_scheme=shard_scheme,
-        ceil_mode=False,
+        ceil_mode=ceil_mode,
         nightly_skips=False,
         dram_slice_config=dram_slice_config,
         output_layout=output_layout,

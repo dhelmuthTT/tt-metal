@@ -859,7 +859,10 @@ std::vector<ttnn::Tensor> Pool2dSliceAttr::run_L1_op(
 
     int input_slice_height = input_slice_height_end - input_slice_height_start;
     int input_slice_width = input_slice_width_end - input_slice_width_start;
-
+    auto this_ceil_mode = ceil_mode;
+    if (this_ceil_pad[0] > 0 || this_ceil_pad[1] > 0) {
+        this_ceil_mode = true;
+    }
     return pool2d_L1(
         sliced_input_tensor,
         pool_type,
@@ -871,7 +874,7 @@ std::vector<ttnn::Tensor> Pool2dSliceAttr::run_L1_op(
         stride,
         this_slice_padding,
         dilation,
-        ceil_mode,
+        this_ceil_mode,
         count_include_pad,
         divisor_override,
         std::nullopt,

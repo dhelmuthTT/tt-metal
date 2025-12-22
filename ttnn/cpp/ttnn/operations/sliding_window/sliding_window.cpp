@@ -1155,7 +1155,7 @@ auto fmt::formatter<ttnn::operations::sliding_window::SlidingWindowConfig>::form
     -> format_context::iterator {
     std::string str = fmt::format(
         "SlidingWindowConfig(batch_size={}, input_hw=({},{}), window_hw=({},{}), stride_hw=({},{}), padding=(({}, {}), "
-        "({}, {})), output_padding = ({}, {}), "
+        "({}, {})), output_padding = ({}, {}),{}"
         "dilation_hw=({},{}), num_cores_nhw={}, num_cores_c={}, core_range_set_={}, is_transpose={})",
         t.batch_size,
         t.input_hw.first,
@@ -1170,6 +1170,8 @@ auto fmt::formatter<ttnn::operations::sliding_window::SlidingWindowConfig>::form
         t.padding[3],
         t.output_pad_hw.first,
         t.output_pad_hw.second,
+        t.ceil_pad_hw.has_value() ? fmt::format(", ceil_pad_hw=({}, {})", t.ceil_pad_hw->first, t.ceil_pad_hw->second)
+                                  : "",
         t.dilation_hw.first,
         t.dilation_hw.second,
         t.num_cores_nhw,

@@ -416,10 +416,10 @@ from ttnn.operations.conv2d import (
     prepare_conv_transpose2d_bias,
     SlidingWindowParallelConfig,
     Op2DSliceConfig,
-    Op2dDRAMSliceHeight,
-    Op2dDRAMSliceWidth,
-    Op2dL1Full,
-    Op2dL1FullSliceConfig,
+    Op2DDRAMSliceHeight,
+    Op2DDRAMSliceWidth,
+    Op2DL1Full,
+    Op2DL1FullSliceConfig,
 )
 
 from ttnn.operations.pool import (
