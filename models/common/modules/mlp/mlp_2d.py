@@ -351,6 +351,7 @@ class MLP2DConfig:
             f"Got cluster_shape={self.cluster_shape}. For 1D meshes, use MLP1D instead."
         )
 
+    # todo)) make the configs flatter --> one click away! --> this is what killed deepseek code
     # Sub-configs - override these factory methods in subclasses
     @cached_property
     def decode_config(self) -> MLP2DDecodeConfigs:
@@ -439,17 +440,17 @@ class MLP2DConfig:
     @cached_property
     def w1(self) -> ttnn.Tensor:
         """w1 weight: (dim, hidden_dim) 2D-sharded."""
-        return self.lazy_w1.get_weight()
+        return self.lazy_w1.get_device_weight()
 
     @cached_property
     def w2(self) -> ttnn.Tensor:
         """w2 weight: (hidden_dim, dim) 2D-sharded."""
-        return self.lazy_w2.get_weight()
+        return self.lazy_w2.get_device_weight()
 
     @cached_property
     def w3(self) -> ttnn.Tensor:
         """w3 weight: (dim, hidden_dim) 2D-sharded."""
-        return self.lazy_w3.get_weight()
+        return self.lazy_w3.get_device_weight()
 
 
 # =============================================================================
@@ -903,35 +904,35 @@ class MLP2D(LightweightModule):
         ttnn.deallocate(x)
 
         # --- STAGE 2: CCL after W1/W3 (dim-dependent path) ---
-        if self.dim >= 8192:
-            # Path A: reduce_scatter (for large dim)
-            input_mem_cfg = w1_out.memory_config()
+        # if self.dim >= 8192:
+        # Path A: reduce_scatter (for large dim)
+        input_mem_cfg = w1_out.memory_config()
 
-            w1_out = self._reduce_scatter_axis1(w1_out, self.ff1_out_reduce_scatter_memcfg)
-            w3_out = self._reduce_scatter_axis1(w3_out, self.ff1_out_reduce_scatter_memcfg)
-            use_all_gather = True
-        else:
-            # Path B: all_reduce (for smaller dim)
-            w1_out = self._all_reduce_tg(
-                w1_out,
-                cluster_axis=1,
-                dim=3,  # Not used for all_reduce when sharded
-                sharded=True,
-                memory_config=self.ff1_out_gathered_memcfg,
-                reduce_scatter_memory_config=self.ff1_out_reduce_scatter_memcfg,
-                # Use composite RS+AG here; it's robust/correct for summing partials from 2D K-fracturing.
-                use_composite=True,
-            )
-            w3_out = self._all_reduce_tg(
-                w3_out,
-                cluster_axis=1,
-                dim=3,
-                sharded=True,
-                memory_config=self.ff1_out_gathered_memcfg,
-                reduce_scatter_memory_config=self.ff1_out_reduce_scatter_memcfg,
-                use_composite=True,
-            )
-            use_all_gather = False
+        w1_out = self._reduce_scatter_axis1(w1_out, self.ff1_out_reduce_scatter_memcfg)
+        w3_out = self._reduce_scatter_axis1(w3_out, self.ff1_out_reduce_scatter_memcfg)
+        # use_all_gather = True
+        # else:
+        #     # Path B: all_reduce (for smaller dim)
+        #     w1_out = self._all_reduce_tg(
+        #         w1_out,
+        #         cluster_axis=1,
+        #         dim=3,  # Not used for all_reduce when sharded
+        #         sharded=True,
+        #         memory_config=self.ff1_out_gathered_memcfg,
+        #         reduce_scatter_memory_config=self.ff1_out_reduce_scatter_memcfg,
+        #         # Use composite RS+AG here; it's robust/correct for summing partials from 2D K-fracturing.
+        #         use_composite=True,
+        #     )
+        #     w3_out = self._all_reduce_tg(
+        #         w3_out,
+        #         cluster_axis=1,
+        #         dim=3,
+        #         sharded=True,
+        #         memory_config=self.ff1_out_gathered_memcfg,
+        #         reduce_scatter_memory_config=self.ff1_out_reduce_scatter_memcfg,
+        #         use_composite=True,
+        #     )
+        #     use_all_gather = False
 
         # --- STAGE 3: Activation + Multiply ---
         w2_in = ttnn.mul(
@@ -946,9 +947,11 @@ class MLP2D(LightweightModule):
         ttnn.deallocate(w1_out)
 
         # --- STAGE 4: All-gather before W2 (if we used reduce_scatter) ---
-        if use_all_gather:
-            w2_in = self._all_gather_axis1(w2_in, input_mem_cfg)
-            w2_in = ttnn.to_memory_config(w2_in, ttnn.L1_MEMORY_CONFIG)
+        # if use_all_gather:
+        w2_in = self._all_gather_axis1(w2_in, input_mem_cfg)
+        w2_in = ttnn.to_memory_config(w2_in, ttnn.L1_MEMORY_CONFIG)
+        print(f"w2_in.tensor_topology(): {w2_in.tensor_topology()}")
+        print(f"self.w2.tensor_topology(): {self.w2.tensor_topology()}")
 
         # --- STAGE 5: W2 Linear ---
         w2_out = ttnn.linear(
