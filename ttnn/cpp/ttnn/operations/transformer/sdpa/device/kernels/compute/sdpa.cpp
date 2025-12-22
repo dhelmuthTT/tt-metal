@@ -9,8 +9,8 @@
 
 #include "compute_kernel_api.h"
 #include "compute_common.hpp"
-#include "debug/dprint.h"
-#include "debug/dprint_pages.h"
+// #include "debug/dprint.h"
+// #include "debug/dprint_pages.h"
 
 namespace NAMESPACE {
 void MAIN {
@@ -136,24 +136,17 @@ void MAIN {
                 uint32_t alias_mm2_prev_out = cb_out_im_A;
                 uint32_t alias_mm2_cur_out = cb_out_im_B;
 
+                cb_wait_front(cb_q_in, q_chunk_tiles);
                 // loop while k_low < q_high
                 for (uint32_t k_chunk = 0; (k_chunk * Sk_chunk_t) < q_high_idx; ++k_chunk) {
                     const uint32_t k_low_idx = k_chunk * Sk_chunk_t;
                     const uint32_t k_high_idx = k_low_idx + Sk_chunk_t;
 
                     /**
-<<<<<<< HEAD
-                     * QK = Q_CHUNK @ K_CHUNK
-                     *
-                     * matmul_blocks internally waits on both inputs
-                     */
-
-=======
                      * qk_T: [Sq_chunk_t x Sk_chunk_t] with transposed tiles
                      *  = matmul(K[Sk_chunk_t x DHt], Q[DHt x Sq_chunk_t]
                      */
                     cb_wait_front(cb_k_in, k_chunk_tiles);
->>>>>>> 08c23c6494 (First pass at transposed SDPA complete. Good correctness. Reduce on FPU)
                     pack_reconfig_data_format(cb_qk_im);
                     // matmul_blocks(
                     //     cb_k_in,
